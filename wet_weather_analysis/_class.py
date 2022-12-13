@@ -9,10 +9,12 @@ from numpy import NaN
 from pandas import Timedelta
 from pandas.core.groupby import GroupBy
 
-from .definitions import *
-from .helpers import calc_dry_mean, calc_dry_variation_split
-from mp.libs.timeseries.io.my_pickle import read_pickle, write_pickle
-from mp.libs.timeseries.stats.date_analysis import diff_day_type
+from ._helpers.debug_helpers import timeit, lev
+from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split
+from ._helpers.pickle_helpers import read_pickle, write_pickle
+# from .definitions import *
+from .date_analysis import diff_day_type
+
 from mp.libs.timeseries.stats.events import combine_events, span_table, event_duration
 from mp.libs.timeseries.stats.events_converter import mark_event_bool
 from mp.libs.timeseries.stats.freqs import guess_freq
@@ -22,19 +24,6 @@ from mp.libs.timeseries.stats.wastewater import calculate_load_rate
 # from .plots.figures import AnalysePlots
 # import pyarrow as pa
 # import pyarrow.parquet as pq
-
-
-__author__ = "Markus Pichler"
-__copyright__ = "Copyright 2017, University of Technology Graz"
-__credits__ = ["Markus Pichler"]
-__license__ = "LGPL"
-__version__ = "1.0.0"
-__maintainer__ = "Markus Pichler"
-
-
-class FileType:
-    PKL = 'pkl'
-    NONE = ''
 
 
 def isfile(fn):
@@ -59,30 +48,6 @@ UPPER = 'UPPER'
 #         return None
 #     split_times = [int(t) for t in reference_time.split(':')]
 #     return pd.Timedelta(hours=split_times[0], minutes=split_times[1])
-
-fn_middle = u'\u250c' + u'\u2500' * 2  # '├── '
-fn_last = u'\u2514' + u'\u2500' * 2  # '└── '
-par_middle = '   '
-par_last = u'\u2502' + '  '  # '│   '
-
-
-try:
-    from mp.helpers import class_timeit as timeit, check
-    from mp.helpers.check_time import lev
-except ModuleNotFoundError:
-    def timeit(method):
-        @wraps(method)
-        def timed(*args, **kwargs):
-            return method(*args, **kwargs)
-
-        return timed
-
-
-    def check(*args):
-        return
-
-
-    lev = ''
 
 
 def smoother(method):

@@ -1,10 +1,3 @@
-__author__ = "Markus Pichler"
-__copyright__ = "Copyright 2017, University of Technology Graz"
-__credits__ = ["Markus Pichler"]
-__license__ = "LGPL"
-__version__ = "1.0.0"
-__maintainer__ = "Markus Pichler"
-
 from pandas import Series, DataFrame
 from scipy.stats import iqr, gaussian_kde
 from scipy.optimize import minimize_scalar
@@ -12,8 +5,6 @@ import numpy as np
 from datetime import time
 
 
-########################################################################################################################
-########################################################################################################################
 def mad(variation):
     """
     median absolute deviation
@@ -23,7 +14,6 @@ def mad(variation):
     return np.median(np.abs(variation))
 
 
-########################################################################################################################
 def split_mad(variation):
     """
     calculate split median absolute deviation
@@ -34,7 +24,6 @@ def split_mad(variation):
     return np.abs(np.median(variation[variation > 0])), np.abs(np.median(variation[variation < 0]))
 
 
-########################################################################################################################
 def est_bins(a):
     # maximum of the 'Sturges' and 'FD'(Freedman Diaconis) estimators
     # https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.histogram.html
@@ -42,7 +31,6 @@ def est_bins(a):
     return np.max([2 * iqr(a) / num ** (1 / 3), np.log2(num) + 2])
 
 
-########################################################################################################################
 def find_nearest(a, x):
     """
     get index of closest value in array
@@ -53,7 +41,6 @@ def find_nearest(a, x):
     return np.abs(a - x).argmin()
 
 
-########################################################################################################################
 def robust_variance(variation):
     """
 
@@ -74,7 +61,6 @@ def robust_variance(variation):
     return np.std(a[:int(res)])
 
 
-########################################################################################################################
 def robust_mean(_array):
     data = _array
     clip = (np.percentile(data, 1, interpolation='nearest'),
@@ -124,8 +110,6 @@ def robust_mean(_array):
     #     grid, y = kde.support, kde.density
 
 
-########################################################################################################################
-########################################################################################################################
 # @numba.jit
 def _calc_dry_mean(_array, kind):
     array = _array[~np.isnan(_array)]
@@ -147,7 +131,6 @@ def calc_dry_mean(s, kind):
     return _calc_dry_mean(s.values, kind)
 
 
-########################################################################################################################
 # @numba.jit
 def _calc_dry_variation(_variation, kind):
     variation = _variation[~np.isnan(_variation)]
@@ -173,7 +156,6 @@ def calc_dry_variation(s, kind):
     return _calc_dry_variation(s.values, kind)
 
 
-########################################################################################################################
 def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False):
     if isinstance(infer_mean, bool) and infer_mean:
         mean = calc_dry_mean(_variation, kind)
@@ -203,13 +185,11 @@ def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False
         return var, var
 
 
-########################################################################################################################
 def func_dry_variation(variation, kind, time_stamp=None, infer_mean=False):
     upper, lower = calc_dry_variation_split(variation, kind, time_stamp=time_stamp, infer_mean=infer_mean)
     return DataFrame({'UPPER': upper, 'LOWER': lower}, index=variation.index)
 
 
-########################################################################################################################
 # def calc_criterion(s, limit, dry_mean, dry_upper_variance, dry_lower_variance, day_kind_detail):
 #     try:
 #         day = get_kind_of_day(s.index[0], level_of_detail=day_kind_detail)
@@ -228,7 +208,6 @@ def func_dry_variation(variation, kind, time_stamp=None, infer_mean=False):
 #     return Series(index=s.index, data=criteria.values)
 
 
-########################################################################################################################
 # @numba.jit
 def _calc_criterion(_array, kind, time_stamp, limit=1):
     """
