@@ -2,11 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from mp.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
-from mp.projects.cst_monitoring.data_analysis.plots._helpers import (args_to_string, get_compare_diurnal_title,
-                                                                     get_diurnal_title, make_title)
+from mp.projects.cst_monitoring.data_analysis.plots._helpers import (
+    args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title)
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
 
+from mp.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
 from mp.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
 from mp.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
 

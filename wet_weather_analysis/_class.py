@@ -13,6 +13,7 @@ from ._helpers.debug_helpers import timeit, lev
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split
 from ._helpers.pickle_helpers import read_pickle, write_pickle
 # from .definitions import *
+from .definitions import MEDIAN__MAD
 from .date_analysis import diff_day_type
 
 from mp.libs.timeseries.stats.events import combine_events, span_table, event_duration
@@ -89,17 +90,22 @@ class AnalyseData:
 
     def __init__(self, ts, kind=MEDIAN__MAD, limit=2, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
                  make_temp_files=False, file_path='.',
-                 est_best_shift_time=True):  # day_kind_detail=3.1, reference_time='00:00'
+                 est_best_shift_time=True,
+                 min_rain_period=Timedelta(hours=2),
+                 trail_period=Timedelta(hours=4)):  # day_kind_detail=3.1, reference_time='00:00'
         """
 
         Args:
             ts (pd.Seres):
             kind (int): 0,6,8,97,98,1,2,7,99
             limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather.
-            day_kind_detail (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend, ... | default=automated
+            day_kind_detail (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
+            ... | default=automated
             make_temp_files (bool): Whether to make temporary files.
             file_path (str | Path): Path where the temporary files should be saved.
             est_best_shift_time (bool): If the time-shift should be automatically estimated.
+            min_rain_period (Timedelta): Minimum duration from which it is a rain event. Shorter events will be ignored.
+            trail_period (Timedelta): Duration for combining rain events + duration after an event to restore dw-conditions.
         """
         self.ts = ts.replace(0, NaN)
         # kind of calculation method for the dw-mean and the dw-variance
@@ -165,7 +171,8 @@ class AnalyseData:
         self._shifted_ts = self.ts.copy()  # ts only for day-kind calculation
 
         if (day_kind_detail != 1) and est_best_shift_time:
-            self.est_best_shift_time()
+            from .estimate_parameters import est_best_shift_time
+            est_best_shift_time(self)
         # self.day_category_index
         # print()
         # self.est_best_daily_grouping()
@@ -181,9 +188,9 @@ class AnalyseData:
 
         # ----------------
         # duration for event detection
-        self.min_rain_period = None  # Minimum duration from which it is a rain event. Shorter events will be ignored.
-        self.trail_period = None  # Duration for combining rain events + duration after an event to restore dw-conditions.
-        self.min_dry_period = None  # Minimum duration from which it is a dry period. Shorter periods will be ignored.
+        self.min_rain_period = min_rain_period  # Minimum duration from which it is a rain event. Shorter events will be ignored.
+        self.trail_period = trail_period  # Duration for combining rain events + duration after an event to restore dw-conditions.
+        self.min_dry_period = self.trail_period  # Minimum duration from which it is a dry period. Shorter periods will be ignored.
 
     # HELPERS-----------------------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------------------------------
@@ -512,7 +519,7 @@ class AnalyseData:
         return self.criterion.divide(self.limit if limit is None else limit)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def get_wet_weather_table(self, min_rain_period=Timedelta(hours=2), trail_period=Timedelta(hours=4)):
+    def get_wet_weather_table(self, min_rain_period=None, trail_period=None):
         """
         Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
 
@@ -530,14 +537,21 @@ class AnalyseData:
             criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
 
             wet_weather_table = span_table(span_bool=criterion_bool)
-            # it is only a rain event when it rains longer than "min_rain_period"
+            # it is only a wet-weather-event when it is longer than "min_rain_period"
+
+            if min_rain_period is None:
+                min_rain_period = self.min_rain_period
+
+            if trail_period is None:
+                trail_period = self.trail_period
+
             wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= min_rain_period]
 
             # combine close events
             self.wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period)
         return self.wet_weather_table
 
-    def get_dry_weather_table(self, min_dry_period=Timedelta(hours=4)):
+    def get_dry_weather_table(self, min_dry_period=None):
         """
         Get table with dry weather period with a minimum period.
 
@@ -555,13 +569,17 @@ class AnalyseData:
 
             dry_weather_table = span_table(span_bool=criterion_bool)
             # it is only a dw event (period) when it is longer than "min_dry_period" dry.
+
+            if min_dry_period is None:
+                min_dry_period = self.min_dry_period
+
             dry_weather_table = dry_weather_table[event_duration(dry_weather_table) >= min_dry_period]
 
             self.dry_weather_table = dry_weather_table
         return self.dry_weather_table
 
     @timeit
-    def get_dry_weather_bool(self, min_rain_period=Timedelta(hours=2), extra_range=Timedelta(hours=4), fill_na=NaN):
+    def get_dry_weather_bool(self, min_rain_period=None, extra_range=None, fill_na=NaN):
         """
         Mark wet weather periods (including a tail = extra_range) with False and dry weather periods as True.
 
@@ -578,6 +596,13 @@ class AnalyseData:
             pd.Series[bool]: condition of DW-period
         """
         if self.dry_weather_bool is None:
+
+            if min_rain_period is None:
+                min_rain_period = self.min_rain_period
+
+            if extra_range is None:
+                extra_range = self.min_dry_period
+
             ww_period_table = self.get_wet_weather_table(min_rain_period=min_rain_period, trail_period=extra_range).copy()
 
             # extend rain events

@@ -1,7 +1,7 @@
 import pandas as pd
 
-from mp.helpers import timeit, check
-from wet_weather_analysis import AnalyseData
+from ._helpers.debug_helpers import timeit, check
+from ._class import AnalyseData
 
 
 @timeit
