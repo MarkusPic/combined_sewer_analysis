@@ -551,6 +551,28 @@ class AnalyseData:
             self.wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period)
         return self.wet_weather_table
 
+    def get_wet_weather_table2(self, min_rain_period=None, trail_period=None):
+        if self.wet_weather_table is None:
+            # NaNs are assumed to be dry weather
+            criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
+
+            # criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
+
+            wet_weather_table = span_table(span_bool=criterion_bool)
+            # it is only a wet-weather-event when it is longer than "min_rain_period"
+
+            if min_rain_period is None:
+                min_rain_period = self.min_rain_period
+
+            if trail_period is None:
+                trail_period = self.trail_period
+
+            wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= min_rain_period]
+
+            # combine close events
+            self.wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period)
+        return self.wet_weather_table
+
     def get_dry_weather_table(self, min_dry_period=None):
         """
         Get table with dry weather period with a minimum period.
