@@ -78,7 +78,7 @@ def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None
                     upper[day],
                     alpha=.2, color=daykind_color(s.name))
 
-    return ax.get_figure()
+    return ax.get_figure(), ax
 
 
 ########################################################################################################################
@@ -412,13 +412,13 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
     interval_95 = std * 2
     interval_99 = std * 3
 
-    ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label='68.3%')
+    ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label='68.3% (1 $\sigma$)')
     ax.plot(interval_68.index, interval_68, color='orange', ls='--', lw=0.75)
 
-    ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label='95.4%')
+    ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label='95.4% (2 $\sigma$)')
     ax.plot(interval_95.index, interval_95, color='red', ls='--', lw=0.75)
 
-    ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label='99.7%')
+    ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label='99.7% (3 $\sigma$)')
     ax.plot(interval_99.index, interval_99, color='darkviolet', ls='--', lw=0.75)
 
     # ------------
@@ -432,13 +432,13 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
 
     lines_dict_ = get_legend_dict(ax)
     lines_dict_ = {k: v for k, v in lines_dict_.items() if not k.startswith('20')}
-    add_custom_legend(ax, lines_dict_, title='Std.')
+    add_custom_legend(ax, lines_dict_, title='Confidence interval', bbox_to_anchor=(0., 1, 1., 0.), loc='lower left', ncol=3, )
 
     # ------------
     ax.set_title(f'{day} - Uncertainty')
-    ax.get_figure().tight_layout()
+    # ax.get_figure().tight_layout()
     # ax.get_figure().show()
-    return ax.get_figure()
+    return ax.get_figure(), ax
 
 
 AnalyseData.figure_diurnal_density = diurnal_density
