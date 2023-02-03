@@ -20,21 +20,7 @@ LANG = ENG
 
 
 ########################################################################################################################
-def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None, title=None, lang=LANG):
-    """
-    
-    :param data:
-    :param day_series:
-    :param ylim:
-    :param smooth:
-    :param show_rain:
-    :param unit:
-    :param title:
-
-    :return:
-    :rtype: plt.Figure
-    """
-
+def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None, title=None, lang=LANG, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
     # Statistical Tests for Normality
     # from scipy.stats import *
     # https://towardsdatascience.com/normality-tests-in-python-31e04aa4f411
@@ -64,20 +50,27 @@ def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None
     title = make_title(title, default=get_diurnal_title(name=data.name, day=s.name, kind=data.arithmetic,
                                                         limit=data.limit, smooth=smooth))
 
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit), title=title)
+    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit), title=title, major_freq=major_freq, minor_freq=minor_freq)
     ax.set_ylim(ylim)
 
-    ax = data.dw_mean_table(smooth=smooth)[day].plot(ax=ax, color=daykind_color(s.name))
+    # ax = data.dw_mean_table(smooth=smooth)[day].plot(ax=ax, color=daykind_color(s.name))
+
+    m = ax.plot(data.dw_mean_table(smooth=smooth)[day], color=daykind_color(s.name))
 
     bounds = data.get_dw_bound_table(smooth=smooth)
 
     upper, lower = bounds[UPPER], bounds[LOWER]
 
-    ax.fill_between(data.dw_mean_table(smooth=smooth).index,
+    bw = ax.fill_between(data.dw_mean_table(smooth=smooth).index,
                     lower[day],
                     upper[day],
                     alpha=.2, color=daykind_color(s.name))
 
+    # add_custom_legend(ax, {'DW Bandwidth': bw})
+    ax.legend(m + [bw], ['DW Mean', 'DW Bandwidth'])
+
+    # ax.get_figure().show()
+    # ax.legend().remove()
     return ax.get_figure(), ax
 
 
@@ -392,7 +385,7 @@ def dry_trend(data, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-W
 
 
 ########################################################################################################################
-def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=None, title=None):
+def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=None, title=None, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
@@ -427,7 +420,7 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
     ax.set_ylim(-ylim, ylim)
 
     # ------------
-    ax = diurnal_axes(ax)  # , ylab=cst_label(data.name, unit=unit), title=title)
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)  # , ylab=cst_label(data.name, unit=unit), title=title)
     ax.legend()
 
     lines_dict_ = get_legend_dict(ax)

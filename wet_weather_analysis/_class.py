@@ -2,6 +2,7 @@ from functools import wraps
 from os import path
 from pathlib import Path
 from sys import platform
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -42,7 +43,8 @@ DW_BOOL = 'DW-BOOL'
 DW_AVAILABILITY = 'DW-AVAILABILITY'
 LOWER = 'LOWER'
 MEAN = 'MEAN'
-UPPER = 'UPPER'
+UPPER: str = 'UPPER'
+AUTO = 'auto'
 
 # def shift2delta(reference_time):
 #     if reference_time == '00:00':
@@ -720,7 +722,7 @@ class AnalyseData:
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
     @smoother
-    def get_dry_filling_series(self, which=MEAN):
+    def get_dry_filling_series(self, which: Literal[UPPER, LOWER, MEAN, AUTO]=MEAN):
         """
         Uses the measured time-series and fills wet-weather periods with estimated dry-weather values.
 
@@ -750,7 +752,7 @@ class AnalyseData:
             factor = {MEAN: 0,
                       UPPER: 100,
                       LOWER: -100,
-                      'auto': self.get_criterion_level_series()
+                      AUTO: self.get_criterion_level_series()
                       }[which]
 
             out = criterion.sub(factor).abs() > self.ww_crit_limit
@@ -758,7 +760,7 @@ class AnalyseData:
             fill_series = {MEAN: self.get_dw_mean_series(smooth=1),
                            UPPER: self.get_dw_range_series(smooth=1)[UPPER],
                            LOWER: self.get_dw_range_series(smooth=1)[LOWER],
-                           'auto': self.get_dw_continuum_series(smooth=1)
+                           AUTO: self.get_dw_continuum_series(smooth=1)
                            }[which]
 
             self.cont.loc[out, which] = fill_series[out]
@@ -907,7 +909,7 @@ class AnalyseLoadRate(AnalyseData):
         self.flow = flow
         self.concentration = concentration
         self.label_parameter = label_parameter
-        lr = calculate_load_rate(concentration, flow)  # kg/min
+        lr = calculate_load_rate(concentration, flow)  # kg/[FREQ of flow]
         lr.index.name = ''
 
         AnalyseData.__init__(self, lr, **kwargs)
