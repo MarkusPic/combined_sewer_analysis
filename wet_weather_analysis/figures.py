@@ -185,6 +185,13 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
     return fig
 
 
+def diurnal_density_full(ts, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
+    data_table = compare_daily_times_table(ts)
+    ax = data_table.T.plot(alpha=0.05, legend=False, color='k')
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
+    return ax.get_figure(), ax
+
+
 def weekly_density_plot(data, ax=None, add_mean=True, color='k', smooth=None):
     data_table = compare_week_table(data.ts[data.day_category_index != '8 Holiday'].copy())
     ax = data_table.T.plot(alpha=0.05, legend=False, color=color, ax=ax, rasterized=True)
@@ -294,7 +301,7 @@ def stability_analysis(data, kind=1, var=False, lang=LANG):
 
 
 ########################################################################################################################
-def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG):
+def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
     """
 
     Args:
@@ -331,9 +338,9 @@ def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lin
     title = make_title(title, default=get_compare_diurnal_title(name=data.name))
     # title = get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit, smooth=smooth)
 
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title)
+    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title, major_freq=major_freq, minor_freq=minor_freq)
     ax.set_ylim(ylim)
-    return ax.get_figure()
+    return ax.get_figure(), ax
 
 
 ########################################################################################################################
