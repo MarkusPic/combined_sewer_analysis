@@ -48,7 +48,7 @@ def get_school_holidays():
 
 def get_holidays(year, state='ST'):
     """
-    the the dates a the austrian national holidays
+    the dates of the austrian national holidays
 
     Args:
         year (list[int] | int): year(s)

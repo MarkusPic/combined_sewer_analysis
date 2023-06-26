@@ -554,6 +554,17 @@ class AnalyseData:
         return self.wet_weather_table
 
     def get_wet_weather_table2(self, min_rain_period=None, trail_period=None):
+        """
+        Event definition:
+            Value must be greater than DW-continuum + 2 x DW-uncertainty
+
+        Args:
+            min_rain_period:
+            trail_period:
+
+        Returns:
+
+        """
         if self.wet_weather_table is None:
             # NaNs are assumed to be dry weather
             criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
