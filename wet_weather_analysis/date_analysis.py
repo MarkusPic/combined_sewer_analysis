@@ -17,6 +17,7 @@ class DAY_KIND:
     BRIDGE_DAY = 'Bridge Day'
     FAKE_FRIDAY = 'Fake Friday'  # day before a holiday
 
+
 ALL_DAYS = 'Day'
 HOLIDAY = 'Holiday'
 WORKDAY = 'Workday'
@@ -31,10 +32,10 @@ FAKE_FRIDAY = 'Fake Friday'  # day before a holiday
 austrian national holidays
 """
 
-
 """
 https://www.feiertagskalender.ch/ferien.php?geo=3129
 """
+
 
 def get_school_holidays():
     df = read_csv(Path(__file__) / '_helpers' / 'school_holidays_styria_2005-2023.csv',
@@ -48,7 +49,9 @@ def get_school_holidays():
 
 def get_holidays(year, state='ST'):
     """
-    the dates of the austrian national holidays
+    Get the dates of the austrian national holidays.
+
+    https://en.wikipedia.org/wiki/ISO_3166-2:AT
 
     Args:
         year (list[int] | int): year(s)
@@ -58,7 +61,18 @@ def get_holidays(year, state='ST'):
     Returns:
         dict[date,str]: dictionary with the timestamp as the key and the name of the holiday as the value
     """
-    return holidays.Austria(state=state, years=year)
+    states = {
+        'B': 1,
+        'K': 2,
+        'N': 3,
+        'O': 4,
+        'S': 5,
+        'ST': 6,
+        'T': 7,
+        'V': 8,
+        'W': 9
+    }
+    return holidays.Austria(subdiv=states.get(state.upper(), state), years=year)
 
 
 def get_holidays_as_index(year, state='ST'):
