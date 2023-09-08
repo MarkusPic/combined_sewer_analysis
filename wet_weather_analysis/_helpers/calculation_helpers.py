@@ -63,8 +63,8 @@ def robust_variance(variation):
 
 def robust_mean(_array):
     data = _array
-    clip = (np.percentile(data, 1, interpolation='nearest'),
-            np.percentile(data, 99, interpolation='lower'))
+    clip = (np.percentile(data, 1, method='nearest'),
+            np.percentile(data, 99, method='lower'))
     data = np.clip(data, *clip)
     kde = gaussian_kde(data)
     bw = kde.factor

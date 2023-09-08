@@ -38,7 +38,7 @@ https://www.feiertagskalender.ch/ferien.php?geo=3129
 
 
 def get_school_holidays():
-    df = read_csv(Path(__file__) / '_helpers' / 'school_holidays_styria_2005-2023.csv',
+    df = read_csv(Path(__file__).parent / '_helpers' / 'school_holidays_styria_2005-2023.csv',
                   skip_blank_lines=True, skipinitialspace=True, sep=';')
     # "Beginn";"Ende";"Bezeichnung";"Bemerkungen";
     df['Beginn'] = to_datetime(df['Beginn'], format='%d.%m.%Y')

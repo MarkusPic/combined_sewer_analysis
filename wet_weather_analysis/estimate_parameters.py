@@ -112,7 +112,7 @@ def est_best_shift_time(data: AnalyseData):
     #     self.day_kind_detail = 9  # temporary
 
     fn = data.filename('best_time_shift')
-    if isfile(fn):
+    if fn.is_file():
         data.shift_delta = data._read(fn)
     else:
 

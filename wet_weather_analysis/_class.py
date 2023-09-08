@@ -43,7 +43,7 @@ DW_BOOL = 'DW-BOOL'
 DW_AVAILABILITY = 'DW-AVAILABILITY'
 LOWER = 'LOWER'
 MEAN = 'MEAN'
-UPPER: str = 'UPPER'
+UPPER = 'UPPER'
 AUTO = 'auto'
 
 # def shift2delta(reference_time):

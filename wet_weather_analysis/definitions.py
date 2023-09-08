@@ -1,4 +1,3 @@
-
 # kind
 MEDIAN__MAD = 0
 MEDIAN__PART_SPLIT_MAD = 6
@@ -10,10 +9,12 @@ ROB_MEAN__MAD = 2
 ROB_MEAN__PART_SPLIT_MAD = 7
 MEAN__STD = 99
 
+
 class MEAN_CALC:
     MEDIAN = 'median'
     ROB_MEAN = 'rob_mean'
     MEAN = 'mean'
+
 
 class DEV_CALC:
     MAD = 'mad'
