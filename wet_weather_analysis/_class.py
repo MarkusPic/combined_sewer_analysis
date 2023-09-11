@@ -144,8 +144,8 @@ class AnalyseData:
 
         # ----
         # table
-        self.dry_weather_table = None
-        self.wet_weather_table = None
+        self.dry_weather_span_table = None
+        self.wet_weather_span_table = None
 
         # # analyse helpers
         # add a number to the day labels
@@ -521,7 +521,7 @@ class AnalyseData:
         return self.criterion.divide(self.limit if limit is None else limit)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def get_wet_weather_table(self, min_rain_period=None, trail_period=None):
+    def get_wet_weather_span_table(self, min_rain_period=None, trail_period=None):
         """
         Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
 
@@ -534,7 +534,7 @@ class AnalyseData:
         Returns:
             pd.DataFrame: events with start and end times
         """
-        if self.wet_weather_table is None:
+        if self.wet_weather_span_table is None:
             # NaNs are assumed to be dry weather
             criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
 
@@ -550,10 +550,10 @@ class AnalyseData:
             wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= min_rain_period]
 
             # combine close events
-            self.wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period)
-        return self.wet_weather_table
+            self.wet_weather_span_table = combine_events(wet_weather_table, new_event_after=trail_period)
+        return self.wet_weather_span_table
 
-    def get_wet_weather_table2(self, min_rain_period=None, trail_period=None):
+    def get_wet_weather_span_table2(self, min_rain_period=None, trail_period=None):
         """
         Event definition:
             Value must be greater than DW-continuum + 2 x DW-uncertainty
@@ -565,7 +565,7 @@ class AnalyseData:
         Returns:
 
         """
-        if self.wet_weather_table is None:
+        if self.wet_weather_span_table is None:
             # NaNs are assumed to be dry weather
             criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
 
@@ -583,8 +583,8 @@ class AnalyseData:
             wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= min_rain_period]
 
             # combine close events
-            self.wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period)
-        return self.wet_weather_table
+            self.wet_weather_span_table = combine_events(wet_weather_table, new_event_after=trail_period)
+        return self.wet_weather_span_table
 
     def get_dry_weather_table(self, min_dry_period=None):
         """
@@ -598,7 +598,7 @@ class AnalyseData:
         Returns:
             pd.DataFrame: events with start and end times
         """
-        if self.dry_weather_table is None:
+        if self.dry_weather_span_table is None:
             # NaNs are assumed to be wet weather
             criterion_bool = self.get_criterion_series().fillna(self.dw_crit_limit+1) < self.dw_crit_limit
 
@@ -610,8 +610,8 @@ class AnalyseData:
 
             dry_weather_table = dry_weather_table[event_duration(dry_weather_table) >= min_dry_period]
 
-            self.dry_weather_table = dry_weather_table
-        return self.dry_weather_table
+            self.dry_weather_span_table = dry_weather_table
+        return self.dry_weather_span_table
 
     @timeit
     def get_dry_weather_bool(self, min_rain_period=None, extra_range=None, fill_na=NaN):
@@ -638,7 +638,7 @@ class AnalyseData:
             if extra_range is None:
                 extra_range = self.min_dry_period
 
-            ww_period_table = self.get_wet_weather_table(min_rain_period=min_rain_period, trail_period=extra_range).copy()
+            ww_period_table = self.get_wet_weather_span_table(min_rain_period=min_rain_period, trail_period=extra_range).copy()
 
             # extend rain events
             ww_period_table['end'] += extra_range
