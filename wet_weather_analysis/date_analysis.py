@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from datetime import date
+from datetime import date, datetime
 import holidays
+import pandas as pd
 
 from pandas import DatetimeIndex, Series, Timedelta, Timestamp, Index, date_range, to_datetime, read_csv
 
@@ -45,6 +46,25 @@ def get_school_holidays():
     df['Ende'] = to_datetime(df['Ende'], format='%d.%m.%Y')
     df['Ende'] += Timedelta(days=1, seconds=-1)
     return df
+
+
+def get_school_holidays_as_index(freq):
+    school_holidays = get_school_holidays()
+    index = pd.date_range(school_holidays['Start'][0], school_holidays['Ende'][-1], freq=freq)
+    bool_series = is_school_holiday(index)
+    return bool_series[bool_series].index
+
+
+def is_school_holiday(time_data):
+    school_holidays = get_school_holidays()
+    if isinstance(time_data, (date, Timestamp, datetime)):
+        return ((school_holidays['Start'] >= time_data) & (school_holidays['Ende'] <= time_data)).any()
+
+    elif isinstance(time_data, DatetimeIndex):
+        bool_series = pd.Series(index=time_data, data=False)
+        for _, holiday_period in school_holidays.iterrows():
+            bool_series[holiday_period['Start']:holiday_period['Ende']] = True
+        return bool_series
 
 
 def get_holidays(year, state='ST'):
