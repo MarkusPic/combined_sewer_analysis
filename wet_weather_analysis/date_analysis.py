@@ -50,7 +50,7 @@ def get_school_holidays():
 
 def get_school_holidays_as_index(freq):
     school_holidays = get_school_holidays()
-    index = pd.date_range(school_holidays['Start'][0], school_holidays['Ende'][-1], freq=freq)
+    index = pd.date_range(school_holidays['Beginn'][0], school_holidays['Ende'][-1], freq=freq)
     bool_series = is_school_holiday(index)
     return bool_series[bool_series].index
 
@@ -58,12 +58,12 @@ def get_school_holidays_as_index(freq):
 def is_school_holiday(time_data):
     school_holidays = get_school_holidays()
     if isinstance(time_data, (date, Timestamp, datetime)):
-        return ((school_holidays['Start'] >= time_data) & (school_holidays['Ende'] <= time_data)).any()
+        return ((school_holidays['Beginn'] >= time_data) & (school_holidays['Ende'] <= time_data)).any()
 
     elif isinstance(time_data, DatetimeIndex):
         bool_series = pd.Series(index=time_data, data=False)
         for _, holiday_period in school_holidays.iterrows():
-            bool_series[holiday_period['Start']:holiday_period['Ende']] = True
+            bool_series[holiday_period['Beginn']:holiday_period['Ende']] = True
         return bool_series
 
 
