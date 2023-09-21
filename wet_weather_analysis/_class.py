@@ -248,6 +248,8 @@ class AnalyseData:
         return guess_freq(self.ts.index)
 
     def get_window_size(self, window: pd.Timedelta):
+        if isinstance(window, int):
+            return window
         return int(round(window / self.guessed_freq))
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -673,6 +675,68 @@ class AnalyseData:
         self.dry_weather_bool = bool_series.rename(DW_BOOL)
 
     # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _smooth_criterion(criterion, smooth):
+        # prediction over <smooth>/4 with last values
+        criterion_smooth = criterion.rolling(smooth, center=True, min_periods=int(smooth / 4)).mean()
+        # interpolate between the predictions
+        criterion_level = criterion_smooth.interpolate(limit=smooth * 2, limit_direction='both', limit_area='inside')
+        # fill the rest with 0
+
+        if testing := False:
+            import matplotlib.pyplot as plt
+
+            selection = slice('2010-09-03', '2010-09-09')
+            selection = slice(None)
+            fig, ax = plt.subplots()
+            criterion.loc[selection].plot(ax=ax)
+            # fig.show()
+
+            criterion_level[selection].plot(ax=ax)
+            # ax.set_ylim(-100, 70)
+            fig.show()
+
+            c = AnalyseData(criterion, day_kind_detail=1)
+
+
+            c.dw_mean_table().plot().get_figure().show()
+            c.dw_variance_table().plot().get_figure().show()
+
+            from wet_weather_analysis.figures import diurnal_density_full, weekly_density_plot
+            fig, ax = diurnal_density_full(criterion)
+            fig.show()
+
+            fig, ax = weekly_density_plot(AnalyseData(criterion, day_kind_detail=8, est_best_shift_time=False))
+            ax.set_ylim(-100, 100)
+            fig.set_size_inches(12,8)
+            fig.show()
+
+            from statsmodels.tsa.api import ExponentialSmoothing
+
+            # Identify missing values (NaNs)
+            missing_mask = criterion.isnull()
+
+            # Split your data into two parts: one with missing values and one without
+            data_with_missing = criterion[missing_mask]
+            data_without_missing = criterion[~missing_mask]
+
+            # Define your ExponentialSmoothing model (you can choose the appropriate settings)
+            model = ExponentialSmoothing(criterion.interpolate().dropna(),
+                                         seasonal='add',
+                                         seasonal_periods=12*24, freq='5min')
+
+            # Fit the model to the data without missing values
+            model_fit = model.fit()
+
+            # Forecast the missing values
+            forecasted_values = model_fit.forecast(steps=len(data_with_missing))
+
+            # Fill in the missing values in the original DataFrame
+            # df.loc[missing_mask, 'your_column_with_time_series'] = forecasted_values
+
+
+        return criterion_level.fillna(0)
+
     @timeit
     def get_criterion_level_series(self, smooth_window=pd.Timedelta(days=2)):
         """
@@ -693,13 +757,7 @@ class AnalyseData:
             dw_bool = self.get_dry_weather_bool().fillna(False)
             criterion[~dw_bool] = np.NAN
 
-            # prediction over <smooth>/4 with last values
-            criterion = criterion.rolling(smooth, center=True, min_periods=int(smooth / 4)).mean()
-            # interpolate between the predictions
-            criterion_level = criterion.interpolate(limit=smooth * 2, limit_direction='both', limit_area='inside')
-            # fill the rest with 0
-            criterion_level = criterion_level.fillna(0)
-            self.criterion_level = criterion_level.rename(DW_LEVEL)
+            self.criterion_level = self._smooth_criterion(criterion, smooth).rename(DW_LEVEL)
         return self.criterion_level.rolling(smooth, center=True, min_periods=1).mean()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -729,6 +787,25 @@ class AnalyseData:
             # self.dry_continuum = (regular + (self.ts - regular) * level / criterion).rename(DW_CONTINUUM)
             self.dry_continuum = cont.rename(DW_CONTINUUM)
         return self.dry_continuum
+
+    def get_dw_event_series(self, start, end):
+        regular = self.get_dw_mean_series(smooth=1).loc[start:end]
+        criterion = self.get_criterion_series(smooth=1)
+        # level = self.get_criterion_level_series()  # .round(1)
+        var = self.get_dw_variance_series(smooth=1).loc[start:end]
+
+        criterion[start:end] = np.NAN
+
+        level = self._smooth_criterion(criterion, smooth=self.get_window_size(pd.Timedelta(days=2))).loc[start:end]
+
+        lower = level < 0
+        higher = level > 0
+
+        cont = regular.copy()
+        cont[lower] += var[LOWER] * level[lower] / 100 * self.limit
+        cont[higher] += var[UPPER] * level[higher] / 100 * self.limit
+
+        return cont.rename(DW_CONTINUUM)
 
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
