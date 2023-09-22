@@ -734,13 +734,13 @@ class AnalyseData:
             # Fill in the missing values in the original DataFrame
             # df.loc[missing_mask, 'your_column_with_time_series'] = forecasted_values
 
-
         return criterion_level.fillna(0)
 
     @timeit
     def get_criterion_level_series(self, smooth_window=pd.Timedelta(days=2)):
         """
         Smoothed dry-weather-criterion only considering dw-periods.
+
         Wet-weather periods will have a criterion of 0.
         Smoothed criterion over <smooth_window> duration.
         Interpolation between <smooth_window * 2> long gaps.
@@ -766,6 +766,7 @@ class AnalyseData:
     def get_dw_continuum_series(self) -> pd.Series:
         """
         Get a dry-weather-continuum time-series based on the criterion-level.
+
         CONTINUUM = MEAN + CRITERION * VARIANCE
 
         Returns:
