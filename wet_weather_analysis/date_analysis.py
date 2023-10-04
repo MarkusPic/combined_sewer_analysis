@@ -61,6 +61,9 @@ def is_school_holiday(time_data):
         return ((school_holidays['Beginn'] >= time_data) & (school_holidays['Ende'] <= time_data)).any()
 
     elif isinstance(time_data, DatetimeIndex):
+        if time_data.tz is not None:
+            school_holidays['Beginn'] = school_holidays['Beginn'].dt.tz_localize(time_data.tz)
+            school_holidays['Ende'] = school_holidays['Ende'].dt.tz_localize(time_data.tz)
         bool_series = pd.Series(index=time_data, data=False)
         for _, holiday_period in school_holidays.iterrows():
             bool_series[holiday_period['Beginn']:holiday_period['Ende']] = True

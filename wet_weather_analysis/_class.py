@@ -90,7 +90,7 @@ class AnalyseData:
     def __str__(self):
         return 'AnalyseData({}, kind={}, dkd={})'.format(self.name, self.arithmetic, self.day_kind_detail)
 
-    def __init__(self, ts, kind=MEDIAN__MAD, limit=2, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
+    def __init__(self, ts, kind=MEDIAN__MAD, limit=2.965, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
                  make_temp_files=False, file_path='.',
                  est_best_shift_time=True,
                  min_rain_period=Timedelta(hours=2),
@@ -100,7 +100,7 @@ class AnalyseData:
         Args:
             ts (pd.Seres):
             kind (int): 0,6,8,97,98,1,2,7,99
-            limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather.
+            limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather. 2.965 MAD = 2 std = 95%
             day_kind_detail (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
             ... | default=automated
             make_temp_files (bool): Whether to make temporary files.
@@ -527,6 +527,9 @@ class AnalyseData:
         """
         Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
 
+        Event definition:
+            Value must be greate than the expected DW-range
+
         Gaps (NaN) in the timeseries will be defaulted to dry weather.
 
         Args:
@@ -557,21 +560,23 @@ class AnalyseData:
 
     def get_wet_weather_span_table2(self, min_rain_period=None, trail_period=None):
         """
+        Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
+
         Event definition:
             Value must be greater than DW-continuum + 2 x DW-uncertainty
 
+        Gaps (NaN) in the timeseries will be defaulted to dry weather.
+
         Args:
-            min_rain_period:
-            trail_period:
+            min_rain_period (Timedelta): Minimum duration that counts as a rain event / wet weather period.
+            trail_period (Timedelta): Nachlaufzeit | minimum duration to separate following events.
 
         Returns:
-
+            pd.DataFrame: events with start and end times
         """
         if self.wet_weather_span_table is None:
             # NaNs are assumed to be dry weather
             criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
-
-            # criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
 
             wet_weather_table = span_table(span_bool=criterion_bool)
             # it is only a wet-weather-event when it is longer than "min_rain_period"
@@ -635,21 +640,24 @@ class AnalyseData:
         if self.dry_weather_bool is None:
 
             if min_rain_period is None:
-                min_rain_period = self.min_rain_period
+                min_rain_period = self.min_rain_period  # default: 2h
 
             if extra_range is None:
-                extra_range = self.min_dry_period
+                extra_range = self.min_dry_period  # default: 4h
 
+            # ---
             ww_period_table = self.get_wet_weather_span_table(min_rain_period=min_rain_period, trail_period=extra_range).copy()
 
             # extend rain events
             ww_period_table['end'] += extra_range
 
             index = self.ts.index
+            last_timestamp = index[-1]
 
             # so the extended end is not longer than the series
-            ww_period_table['end'] = ww_period_table['end'].clip(upper=index[-1])
+            ww_period_table['end'] = ww_period_table['end'].clip(upper=last_timestamp)
 
+            # ---
             dw_period_table = self.get_dry_weather_table(min_dry_period=extra_range).copy()
 
             # make dry period bool series
@@ -697,7 +705,6 @@ class AnalyseData:
             fig.show()
 
             c = AnalyseData(criterion, day_kind_detail=1)
-
 
             c.dw_mean_table().plot().get_figure().show()
             c.dw_variance_table().plot().get_figure().show()
