@@ -11,7 +11,7 @@ from pandas import Timedelta
 from pandas.core.groupby import GroupBy
 
 from ._helpers.debug_helpers import timeit, lev
-from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split
+from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split, mad, mad_
 from ._helpers.pickle_helpers import read_pickle, write_pickle
 # from .definitions import *
 from .definitions import MEDIAN__MAD
@@ -497,11 +497,14 @@ class AnalyseData:
         if isfile(fn):
             return self._read(fn, dtype=pd.Series)
         else:
+            # difference of measurement to dw-mean
             diff = self.ts - self.get_dw_mean_series(arithmetic, smooth=None)
             var = self.get_dw_variance_series(arithmetic, smooth=None)
 
+            #
             lower = diff < -accuracy
             higher = diff > accuracy
+
             crit = diff.copy()
             crit[(diff > -accuracy) & (diff < accuracy)] = 0
             crit[lower] /= var.loc[lower, LOWER]
@@ -629,6 +632,8 @@ class AnalyseData:
 
         Short events will not have trail-periods and will be ignored.
 
+        TODO: enthält falsche Zeiträume
+
         Args:
             min_rain_period (pandas.Timedelta): minimum period to count as a rain-event_analysis
             extra_range (pandas.Timedelta): extra time between a dry period and wet weather (no more influence)
@@ -638,7 +643,6 @@ class AnalyseData:
             pd.Series[bool]: condition of DW-period
         """
         if self.dry_weather_bool is None:
-
             if min_rain_period is None:
                 min_rain_period = self.min_rain_period  # default: 2h
 
@@ -676,6 +680,32 @@ class AnalyseData:
             dry_weather_bool[self.ts.isna()] = fill_na
             self.dry_weather_bool = dry_weather_bool.rename(DW_BOOL)
 
+        return self.dry_weather_bool
+
+    def get_dry_weather_bool_adv(self):
+        smooth_window = pd.Timedelta(days=2)
+        smooth = self.get_window_size(smooth_window)
+        _rolling_kwargs = dict(window=smooth, center=True, min_periods=int(smooth / 4))
+
+        criterion = self.get_criterion_series(smooth=1)
+
+        dry_weather_bool_simple = criterion < self.dw_crit_limit
+
+        rolling_mean = criterion.where(dry_weather_bool_simple).rolling(**_rolling_kwargs).median()
+
+        rolling_diff = criterion - rolling_mean
+        rolling_std = rolling_diff.where(dry_weather_bool_simple).abs().rolling(**_rolling_kwargs).median() * 2.965
+
+        # ---
+        dry_weather_bool_simple_adv = rolling_diff <= (2 * rolling_std)
+
+        rolling_mean2 = criterion.where(dry_weather_bool_simple_adv).rolling(**_rolling_kwargs).median()
+
+        rolling_diff2 = criterion - rolling_mean2
+        rolling_std2 = rolling_diff2.where(dry_weather_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * 2.965
+
+        self.dry_weather_bool = rolling_diff2 <= (2*rolling_std2)
+        self.dry_weather_bool = self.dry_weather_bool.reindex(self.ts.index).rename(DW_BOOL)
         return self.dry_weather_bool
 
     # ------------------------------------------------------------------------------------------------------------------

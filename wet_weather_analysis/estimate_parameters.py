@@ -176,3 +176,9 @@ def est_best_shift_time(data: AnalyseData):
     # if reset_day_kind:
     #     self.day_kind_detail = 'best'
     #     self._day_category_index = None
+
+
+def est_best_shift_time2(data: AnalyseData):
+    from wet_weather_analysis._helpers.calculation_helpers import mad_
+    dev = data.ts.groupby(data.ts.index.time).agg(mad_)
+    dev.plot().get_figure().show()

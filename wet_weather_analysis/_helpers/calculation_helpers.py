@@ -14,6 +14,16 @@ def mad(variation):
     return np.median(np.abs(variation))
 
 
+def mad_(series):
+    """
+    median absolute deviation
+    :param variation: _np.array_ = values - mean_of_values
+    :return:
+    """
+    median = np.nanmedian(series)
+    return np.nanmedian(np.abs(series-median))
+
+
 def split_mad(variation):
     """
     calculate split median absolute deviation
