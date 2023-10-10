@@ -705,7 +705,11 @@ class AnalyseData:
         rolling_std2 = rolling_diff2.where(dry_weather_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * 2.965
 
         self.dry_weather_bool = rolling_diff2 <= (2*rolling_std2)
+
+        # Split your data into two parts: one with missing values and one without
         self.dry_weather_bool = self.dry_weather_bool.reindex(self.ts.index).rename(DW_BOOL)
+        self.dry_weather_bool = self.dry_weather_bool.where(~self.ts.isnull())
+
         return self.dry_weather_bool
 
     # ------------------------------------------------------------------------------------------------------------------
