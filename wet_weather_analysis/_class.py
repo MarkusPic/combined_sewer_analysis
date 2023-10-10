@@ -17,40 +17,30 @@ from ._helpers.pickle_helpers import read_pickle, write_pickle
 from .definitions import MEDIAN__MAD
 from .date_analysis import diff_day_type
 
-from mp.libs.timeseries.stats.events import combine_events, span_table, event_duration
-from mp.libs.timeseries.stats.events_converter import mark_event_bool
-from mp.libs.timeseries.stats.freqs import guess_freq
-from mp.libs.timeseries.stats.wastewater import calculate_load_rate
-
-# from mp.projects.cst_monitoring.helpers import check
-# from .plots.figures import AnalysePlots
-# import pyarrow as pa
-# import pyarrow.parquet as pq
+from sww.libs.timeseries.stats.events import combine_events, span_table, event_duration
+from sww.libs.timeseries.stats.events_converter import mark_event_bool
+from sww.libs.timeseries.stats.freqs import guess_freq
+from sww.libs.timeseries.stats.wastewater import calculate_load_rate
 
 
 def isfile(fn):
     return path.isfile(f'{fn}.parq') or path.isfile(f'{fn}_{platform}.pkl')
 
 
-# FILETYPE = ''
+class L:
+    __name__ = 'LABEL'
 
-
-DW_CRITERION = 'DW-CRITERION'
-DW_MEAN = 'DW-MEAN'
-DW_LEVEL = 'DW-LEVEL'
-DW_CONTINUUM = 'DW-CONTINUUM'
-DW_BOOL = 'DW-BOOL'
-DW_AVAILABILITY = 'DW-AVAILABILITY'
-LOWER = 'LOWER'
-MEAN = 'MEAN'
-UPPER = 'UPPER'
-AUTO = 'auto'
-
-# def shift2delta(reference_time):
-#     if reference_time == '00:00':
-#         return None
-#     split_times = [int(t) for t in reference_time.split(':')]
-#     return pd.Timedelta(hours=split_times[0], minutes=split_times[1])
+    DW_CRITERION = 'DW-CRITERION'
+    DW_MEAN = 'DW-MEAN'
+    DW_LEVEL = 'DW-LEVEL'
+    DW_CONTINUUM = 'DW-CONTINUUM'
+    DW_BOOL = 'DW-BOOL'
+    DW_AVAILABILITY = 'DW-AVAILABILITY'
+    DW_UNCERTAINTY = 'DW-UNCERTAINTY'
+    LOWER = 'LOWER'
+    MEAN = 'MEAN'
+    UPPER = 'UPPER'
+    AUTO = 'auto'
 
 
 def smoother(method):
@@ -96,6 +86,7 @@ class AnalyseData:
                  min_rain_period=Timedelta(hours=2),
                  trail_period=Timedelta(hours=4)):  # day_kind_detail=3.1, reference_time='00:00'
         """
+        Analyse dry weather conditions in continuous flow and flux measurements.
 
         Args:
             ts (pd.Seres):
@@ -109,7 +100,7 @@ class AnalyseData:
             min_rain_period (Timedelta): Minimum duration from which it is a rain event. Shorter events will be ignored.
             trail_period (Timedelta): Duration for combining rain events + duration after an event to restore dw-conditions.
         """
-        self.ts = ts.replace(0, NaN)
+        self.ts = ts
         # kind of calculation method for the dw-mean and the dw-variance
         self.arithmetic = kind
         self.limit = limit
@@ -372,7 +363,7 @@ class AnalyseData:
                 upper, lower = calc_dry_variation_split(s, kind=self.arithmetic,
                                                         infer_mean=float(agg_dw_mean.loc[s.name[1], s.name[0]]),
                                                         time_stamp=s.name[1])
-                return {UPPER: upper, LOWER: lower, MEAN: np.mean([upper, lower])}
+                return {L.UPPER: upper, L.LOWER: lower, L.MEAN: np.mean([upper, lower])}
 
             variances = self.get_analysis_grouper().apply(_vars)  # multiindex: day - time - (lower/upper)
             variances = variances.unstack([2, 0])
@@ -405,10 +396,10 @@ class AnalyseData:
             limit = self.limit
 
         bound = variance.copy()
-        del bound[MEAN]
+        del bound[L.MEAN]
         bound.columns = bound.columns.remove_unused_levels()
-        for sign, side in [(-1, LOWER), (1, UPPER)]:
-            bound[side] = dry_mean + (variance[side] + variance[MEAN] * (limit - 1)) * sign
+        for sign, side in [(-1, L.LOWER), (1, L.UPPER)]:
+            bound[side] = dry_mean + (variance[side] + variance[L.MEAN] * (limit - 1)) * sign
 
         return bound
 
@@ -434,7 +425,7 @@ class AnalyseData:
     @smoother
     def get_dw_mean_series(self, arithmetic=None) -> pd.Series:
         if arithmetic is not None:
-            return pd.Series(index=self.ts.index, data=self._lookup(self.get_dw_mean_table(arithmetic=arithmetic)), name=DW_MEAN)
+            return pd.Series(index=self.ts.index, data=self._lookup(self.get_dw_mean_table(arithmetic=arithmetic)), name=L.DW_MEAN)
 
         if self.dw_mean is None:
             dw_mean_table = self.dw_mean_table(smooth=1)
@@ -449,7 +440,7 @@ class AnalyseData:
 
             self.dw_mean = pd.Series(index=self.ts.index,
                                      data=self._lookup(dw_mean_table),
-                                     name=DW_MEAN)
+                                     name=L.DW_MEAN)
 
         return self.dw_mean
 
@@ -507,10 +498,10 @@ class AnalyseData:
 
             crit = diff.copy()
             crit[(diff > -accuracy) & (diff < accuracy)] = 0
-            crit[lower] /= var.loc[lower, LOWER]
-            crit[higher] /= var.loc[higher, UPPER]
+            crit[lower] /= var.loc[lower, L.LOWER]
+            crit[higher] /= var.loc[higher, L.UPPER]
             crit *= 100
-            criterion = crit.rename(DW_CRITERION)
+            criterion = crit.rename(L.DW_CRITERION)
             self._write(criterion, fn)
             return criterion
 
@@ -678,7 +669,7 @@ class AnalyseData:
 
             # setting boolean values to NaN will make the series to a type('0') and will convert the boolean to float!
             dry_weather_bool[self.ts.isna()] = fill_na
-            self.dry_weather_bool = dry_weather_bool.rename(DW_BOOL)
+            self.dry_weather_bool = dry_weather_bool.rename(L.DW_BOOL)
 
         return self.dry_weather_bool
 
@@ -707,14 +698,14 @@ class AnalyseData:
         self.dry_weather_bool = rolling_diff2 <= (2*rolling_std2)
 
         # Split your data into two parts: one with missing values and one without
-        self.dry_weather_bool = self.dry_weather_bool.reindex(self.ts.index).rename(DW_BOOL)
+        self.dry_weather_bool = self.dry_weather_bool.reindex(self.ts.index).rename(L.DW_BOOL)
         self.dry_weather_bool = self.dry_weather_bool.where(~self.ts.isnull())
 
         return self.dry_weather_bool
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_dry_weather_bool(self, bool_series):
-        self.dry_weather_bool = bool_series.rename(DW_BOOL)
+        self.dry_weather_bool = bool_series.rename(L.DW_BOOL)
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
@@ -798,7 +789,7 @@ class AnalyseData:
             dw_bool = self.get_dry_weather_bool().fillna(False)
             criterion[~dw_bool] = np.NAN
 
-            self.criterion_level = self._smooth_criterion(criterion, smooth).rename(DW_LEVEL)
+            self.criterion_level = self._smooth_criterion(criterion, smooth).rename(L.DW_LEVEL)
         return self.criterion_level.rolling(smooth, center=True, min_periods=1).mean()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -823,11 +814,11 @@ class AnalyseData:
             higher = level > 0
 
             cont = regular.copy()
-            cont[lower] += var[LOWER] * level[lower] / 100 * self.limit
-            cont[higher] += var[UPPER] * level[higher] / 100 * self.limit
+            cont[lower] += var[L.LOWER] * level[lower] / 100 * self.limit
+            cont[higher] += var[L.UPPER] * level[higher] / 100 * self.limit
 
-            # self.dry_continuum = (regular + (self.ts - regular) * level / criterion).rename(DW_CONTINUUM)
-            self.dry_continuum = cont.rename(DW_CONTINUUM)
+            # self.dry_continuum = (regular + (self.ts - regular) * level / criterion).rename(L.DW_CONTINUUM)
+            self.dry_continuum = cont.rename(L.DW_CONTINUUM)
         return self.dry_continuum
 
     def get_dw_event_series(self, start, end):
@@ -844,15 +835,15 @@ class AnalyseData:
         higher = level > 0
 
         cont = regular.copy()
-        cont[lower] += var[LOWER] * level[lower] / 100 * self.limit
-        cont[higher] += var[UPPER] * level[higher] / 100 * self.limit
+        cont[lower] += var[L.LOWER] * level[lower] / 100 * self.limit
+        cont[higher] += var[L.UPPER] * level[higher] / 100 * self.limit
 
-        return cont.rename(DW_CONTINUUM)
+        return cont.rename(L.DW_CONTINUUM)
 
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
     @smoother
-    def get_dry_filling_series(self, which: Literal[UPPER, LOWER, MEAN, AUTO]=MEAN):
+    def get_dry_filling_series(self, which: Literal[L.UPPER, L.LOWER, L.MEAN, L.AUTO]=L.MEAN):
         """
         Uses the measured time-series and fills wet-weather periods with estimated dry-weather values.
 
@@ -879,24 +870,24 @@ class AnalyseData:
 
             criterion = self.get_criterion_series(smooth=1)
 
-            factor = {MEAN: 0,
-                      UPPER: 100,
-                      LOWER: -100,
-                      AUTO: self.get_criterion_level_series()
+            factor = {L.MEAN: 0,
+                      L.UPPER: 100,
+                      L.LOWER: -100,
+                      L.AUTO: self.get_criterion_level_series()
                       }[which]
 
             out = criterion.sub(factor).abs() > self.ww_crit_limit
 
-            fill_series = {MEAN: self.get_dw_mean_series(smooth=1),
-                           UPPER: self.get_dw_range_series(smooth=1)[UPPER],
-                           LOWER: self.get_dw_range_series(smooth=1)[LOWER],
-                           AUTO: self.get_dw_continuum_series(smooth=1)
+            fill_series = {L.MEAN: self.get_dw_mean_series(smooth=1),
+                           L.UPPER: self.get_dw_range_series(smooth=1)[L.UPPER],
+                           L.LOWER: self.get_dw_range_series(smooth=1)[L.LOWER],
+                           L.AUTO: self.get_dw_continuum_series(smooth=1)
                            }[which]
 
             self.cont.loc[out, which] = fill_series[out]
             self._write(self.cont, fn)
 
-        return self.cont[which].rename(DW_CONTINUUM)
+        return self.cont[which].rename(L.DW_CONTINUUM)
 
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
@@ -906,7 +897,7 @@ class AnalyseData:
             window_num = self.get_window_size(window) # int(round(window / guess_freq(dw_bool.index)))
             roll = dw_bool.fillna(False).rolling(window_num, center=True, min_periods=int(window_num / 4))
             dry_weather_avail = roll.sum() / roll.count() * 100
-            self.dry_weather_avail = dry_weather_avail.rename(DW_AVAILABILITY)
+            self.dry_weather_avail = dry_weather_avail.rename(L.DW_AVAILABILITY)
         return self.dry_weather_avail
 
     def new_level(self):
@@ -964,9 +955,18 @@ class AnalyseData:
     def get_dw_uncertainty_series(self) -> pd.Series:
         dw_uncertainty_table = self.dw_uncertainty_table(smooth=1)
         dw_uncertainty_series = pd.Series(index=self.ts.index,
-                                 data=self._lookup(dw_uncertainty_table),
-                                 name='DW-UNCERTAINTY')
+                                          data=self._lookup(dw_uncertainty_table),
+                                          name=L.DW_UNCERTAINTY)
         return dw_uncertainty_series
+
+    def get_dw_uncertainty_band_series(self) -> pd.DataFrame:
+        dw_cont = self.get_dw_continuum_series()
+        dw_uc = self.get_dw_uncertainty_series()
+
+        return pd.DataFrame({
+            f'{L.DW_UNCERTAINTY}-{L.UPPER}': dw_cont + dw_uc * 2,
+            f'{L.DW_UNCERTAINTY}-{L.LOWER}': dw_cont - dw_uc * 2,
+        })
 
     ####################################################################################################################
     def _write(self, data, fn):

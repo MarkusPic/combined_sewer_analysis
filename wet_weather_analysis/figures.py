@@ -12,7 +12,7 @@ from mp.libs.timeseries.stats.stats import compare_week_table, compare_daily_tim
 
 from ._helpers.debug_helpers import check
 from .date_analysis import get_school_holidays, get_holidays
-from ._class import AnalyseData, UPPER, LOWER
+from ._class import AnalyseData, L
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation
 
 
@@ -59,7 +59,7 @@ def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None
 
     bounds = data.get_dw_bound_table(smooth=smooth)
 
-    upper, lower = bounds[UPPER], bounds[LOWER]
+    upper, lower = bounds[L.UPPER], bounds[L.LOWER]
 
     bw = ax.fill_between(data.dw_mean_table(smooth=smooth).index,
                     lower[day],
@@ -87,7 +87,7 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
         middle_y = day_series.median() * 3
 
     if add_bounds:
-        upper = data.get_dw_bound_table(smooth=smooth)[UPPER]
+        upper = data.get_dw_bound_table(smooth=smooth)[L.UPPER]
         middle_y = max([middle_y, upper.max().max()]) * 1.1
 
     s = day_series.resample(down_scale).mean()
@@ -136,8 +136,8 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
 
         if add_bounds:
             ax.fill_between(data.dw_mean_table(smooth=smooth).index,
-                            agg_dry_bound[(LOWER, day)],
-                            agg_dry_bound[(UPPER, day)],
+                            agg_dry_bound[(L.LOWER, day)],
+                            agg_dry_bound[(L.UPPER, day)],
                             alpha=alpha, color=daykind_color(s.name), lw=2)
 
         if isinstance(dry_data, AnalyseData):
@@ -145,8 +145,8 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
             if add_bounds:
                 agg_dry_bound = data.get_dw_bound_table(smooth=smooth)
 
-                ax = agg_dry_bound[(UPPER, day)].plot(ax=ax, color='yellow', linestyle='dashed', lw=1)
-                ax = agg_dry_bound[(LOWER, day)].plot(ax=ax, color='yellow', linestyle='dashed', lw=1)
+                ax = agg_dry_bound[(L.UPPER, day)].plot(ax=ax, color='yellow', linestyle='dashed', lw=1)
+                ax = agg_dry_bound[(L.LOWER, day)].plot(ax=ax, color='yellow', linestyle='dashed', lw=1)
 
             # ax.fill_between(dry_data.agg_dry_mean(smooth=smooth).index,
             #                 lower[day],
@@ -329,8 +329,8 @@ def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lin
         ax = mean[day].plot(ax=ax, color=daykind_color(day), legend=True)
         if add_bounds:
             ax.fill_between(mean.index,
-                            agg_dry_bound[(LOWER, day)],
-                            agg_dry_bound[(UPPER, day)],
+                            agg_dry_bound[(L.LOWER, day)],
+                            agg_dry_bound[(L.UPPER, day)],
                             alpha=.25, color=daykind_color(day), lw=2)
 
     ylim = get_ylim(data.ts)

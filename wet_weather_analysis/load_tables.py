@@ -1,12 +1,12 @@
 import pandas as pd
-from ._class import UPPER, LOWER
+from ._class import L
 
 
 def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
     mean = data.dw_mean_table()
     agg_dry_bound = data.get_dw_bound_table()
-    upper = agg_dry_bound[UPPER]
-    lower = agg_dry_bound[LOWER]
+    upper = agg_dry_bound[L.UPPER]
+    lower = agg_dry_bound[L.LOWER]
 
     if isinstance(mean, pd.DataFrame) and mean.columns.size == 1:
         mean = mean.iloc[:, 0].copy()
