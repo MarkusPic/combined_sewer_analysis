@@ -17,7 +17,7 @@ from ._helpers.pickle_helpers import read_pickle, write_pickle
 from .definitions import MEDIAN__MAD
 from .date_analysis import diff_day_type
 
-from sww.libs.timeseries.stats.events import combine_events, span_table, event_duration
+from sww.libs.timeseries.stats.events import combine_events, span_table, event_duration, agg_events
 from sww.libs.timeseries.stats.events_converter import mark_event_bool
 from sww.libs.timeseries.stats.freqs import guess_freq
 from sww.libs.timeseries.stats.wastewater import calculate_load_rate
@@ -611,6 +611,12 @@ class AnalyseData:
 
             dry_weather_table = dry_weather_table[event_duration(dry_weather_table) >= min_dry_period]
 
+            # crit = self.get_criterion_series()
+            # for agg in ('min', 'max', 'mean'):
+            #     dry_weather_table[agg] = agg_events(dry_weather_table, crit, agg)
+
+            # crit[mark_event_bool(dry_weather_table, crit.index)]
+
             self.dry_weather_span_table = dry_weather_table
         return self.dry_weather_span_table
 
@@ -680,12 +686,12 @@ class AnalyseData:
 
         criterion = self.get_criterion_series(smooth=1)
 
-        dry_weather_bool_simple = criterion < self.dw_crit_limit
+        dw_bool_simple = criterion < self.dw_crit_limit
 
-        rolling_mean = criterion.where(dry_weather_bool_simple).rolling(**_rolling_kwargs).median()
+        rolling_mean = criterion.where(dw_bool_simple).rolling(**_rolling_kwargs).median()
 
         rolling_diff = criterion - rolling_mean
-        rolling_std = rolling_diff.where(dry_weather_bool_simple).abs().rolling(**_rolling_kwargs).median() * 2.965
+        rolling_std = rolling_diff.where(dw_bool_simple).abs().rolling(**_rolling_kwargs).median() * 2.965
 
         # ---
         dry_weather_bool_simple_adv = rolling_diff <= (2 * rolling_std)
