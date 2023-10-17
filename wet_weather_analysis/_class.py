@@ -13,8 +13,7 @@ from pandas.core.groupby import GroupBy
 from ._helpers.debug_helpers import timeit, lev
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split, mad, mad_
 from ._helpers.pickle_helpers import read_pickle, write_pickle
-# from .definitions import *
-from .definitions import MEDIAN__MAD
+from .definitions import ARITHMETIC
 from .date_analysis import diff_day_type
 
 from sww.libs.timeseries.stats.events import combine_events, span_table, event_duration, agg_events
@@ -80,11 +79,11 @@ class AnalyseData:
     def __str__(self):
         return 'AnalyseData({}, kind={}, dkd={})'.format(self.name, self.arithmetic, self.day_kind_detail)
 
-    def __init__(self, ts, kind=MEDIAN__MAD, limit=2.965, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
+    def __init__(self, ts, kind=ARITHMETIC.MEDIAN__MAD, limit=2.965, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
                  make_temp_files=False, file_path='.',
                  est_best_shift_time=True,
                  min_rain_period=Timedelta(hours=2),
-                 trail_period=Timedelta(hours=4)):  # day_kind_detail=3.1, reference_time='00:00'
+                 trail_period=Timedelta(hours=4), smooth_window=20):  # day_kind_detail=3.1, reference_time='00:00'
         """
         Analyse dry weather conditions in continuous flow and flux measurements.
 
@@ -177,7 +176,7 @@ class AnalyseData:
         self._lookup_columns = None
 
         # ---------------
-        self.smooth_window = 20
+        self.smooth_window = smooth_window
 
         # ----------------
         # duration for event detection
@@ -245,10 +244,10 @@ class AnalyseData:
 
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
-    def get_diff_day_type(self, index):
+    def get_diff_day_type(self, index, level_of_detail=None, add_number=None):
         return diff_day_type(index,
-                             level_of_detail=self.day_kind_detail,
-                             add_number=self._number_day_labels)
+                             level_of_detail=self.day_kind_detail if level_of_detail is None else level_of_detail,
+                             add_number=self._number_day_labels if add_number is None else add_number)
 
     @property
     def day_category_index(self) -> pd.CategoricalIndex:
@@ -263,11 +262,7 @@ class AnalyseData:
                     est_best_daily_grouping(self)
 
                 else:
-                    # self.est_best_shift_time()
                     self._day_category_index = self.get_diff_day_type(self._shifted_ts.index)
-                    # self._day_category_index = diff_day_type(self._shifted_ts.index,
-                    #                                          level_of_detail=self.day_kind_detail,
-                    #                                          add_number=self._number_day_labels)
                 self._write(pd.Series(self._day_category_index, name='Day Category Index'), fn)
 
         return self._day_category_index
@@ -686,21 +681,35 @@ class AnalyseData:
 
         criterion = self.get_criterion_series(smooth=1)
 
-        dw_bool_simple = criterion < self.dw_crit_limit
+        # ---
+        dw_bool_simple = criterion.abs() < self.dw_crit_limit
 
+        # ---
         rolling_mean = criterion.where(dw_bool_simple).rolling(**_rolling_kwargs).median()
 
         rolling_diff = criterion - rolling_mean
-        rolling_std = rolling_diff.where(dw_bool_simple).abs().rolling(**_rolling_kwargs).median() * 2.965
+        rolling_std = rolling_diff.where(dw_bool_simple).abs().rolling(**_rolling_kwargs).median() * 1.4826
 
         # ---
-        dry_weather_bool_simple_adv = rolling_diff <= (2 * rolling_std)
+        dw_bool_simple_adv = rolling_diff.abs() <= (2 * rolling_std)
 
-        rolling_mean2 = criterion.where(dry_weather_bool_simple_adv).rolling(**_rolling_kwargs).median()
+        # ---
+        rolling_mean2 = criterion.where(dw_bool_simple_adv).rolling(**_rolling_kwargs).median()
 
         rolling_diff2 = criterion - rolling_mean2
-        rolling_std2 = rolling_diff2.where(dry_weather_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * 2.965
+        rolling_std2 = rolling_diff2.where(dw_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * 1.4826
 
+        # ---
+        self._interim_dw_bool_adv = pd.DataFrame({
+            '_rolling_mean': rolling_mean,
+            '_rolling_diff': rolling_diff,
+            '_rolling_std': rolling_std,
+            '_rolling_mean2': rolling_mean2,
+            '_rolling_diff2': rolling_diff2,
+            '_rolling_std2': rolling_std2,
+        })
+
+        # ---
         self.dry_weather_bool = rolling_diff2 <= (2*rolling_std2)
 
         # Split your data into two parts: one with missing values and one without

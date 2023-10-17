@@ -169,7 +169,8 @@ def is_bridge_day(time_data, within_days=1):
         time_data = DatetimeIndex([date_ + Timedelta(days=d) for d in range(-within_days, within_days + 1)])
 
     if isinstance(time_data, DatetimeIndex):
-        days = date_range(time_data.min(), time_data.max(), freq='D')
+        time_data_date = time_data.date
+        days = date_range(time_data_date.min(), time_data_date.max(), freq='D')
         # days = Series(index=time_data).asfreq('D').index
         weekends = days.dayofweek >= 5
         holidays = is_holiday(days)
@@ -179,7 +180,7 @@ def is_bridge_day(time_data, within_days=1):
         if single_date:
             return bridge_days[date_]
         else:
-            return Index(time_data.date).isin(bridge_days[bridge_days].index.date)
+            return Index(time_data_date).isin(bridge_days[bridge_days].index.date)
 
 
 def get_kind_of_day(time_stamp, level_of_detail=3):

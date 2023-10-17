@@ -2,14 +2,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from mp.projects.cst_monitoring.data_analysis.plots._helpers import (
-    args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title)
+from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
 
-from mp.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
-from mp.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
-from mp.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
+from sww.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
+from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
+from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
 
+from . import MEDIAN__MAD_SPLIT_FULL
 from ._helpers.debug_helpers import check
 from .date_analysis import get_school_holidays, get_holidays
 from ._class import AnalyseData, L
@@ -20,7 +20,8 @@ LANG = ENG
 
 
 ########################################################################################################################
-def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None, title=None, lang=LANG, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
+def diurnal_density(data, day_series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
+                    major_freq='H', minor_freq='15T', rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     # Statistical Tests for Normality
     # from scipy.stats import *
     # https://towardsdatascience.com/normality-tests-in-python-31e04aa4f411
@@ -38,20 +39,31 @@ def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
-        ax = data_table_dry.T.plot(alpha=0.05, legend=False, color='k')
+        ax = data_table_dry.T.plot(alpha=0.05, legend=False, color='k', rasterized=rasterized)
 
         wet = s[s.index.difference(dry.index)]
         data_table_wet = compare_daily_times_table(wet)
-        ax = data_table_wet.T.plot(alpha=0.05, legend=False, color='cyan', ax=ax)
+        ax = data_table_wet.T.plot(alpha=0.05, legend=False, color='cyan', ax=ax, rasterized=rasterized)
     else:
         data_table = compare_daily_times_table(s)
-        ax = data_table.T.plot(alpha=0.05, legend=False, color='k')
+        ax = data_table.T.plot(alpha=0.05, legend=False, color='k', rasterized=rasterized)
 
-    title = make_title(title, default=get_diurnal_title(name=data.name, day=s.name, kind=data.arithmetic,
-                                                        limit=data.limit, smooth=smooth))
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
 
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit), title=title, major_freq=major_freq, minor_freq=minor_freq)
-    ax.set_ylim(ylim)
+    ax.set(ylim=ylim)
+
+    if title:
+        title = make_title(title,
+                           default=get_diurnal_title(name=data.name,
+                                                     day=s.name,
+                                                     kind=data.arithmetic,
+                                                     limit=data.limit,
+                                                     smooth=smooth))
+
+        ax.set_title(title, fontsize=12, fontweight='bold')
+
+    if ylab:
+        ax.set_ylabel(cst_label(data.name, unit=unit))
 
     # ax = data.dw_mean_table(smooth=smooth)[day].plot(ax=ax, color=daykind_color(s.name))
 
@@ -77,7 +89,7 @@ def diurnal_density(data, day_series, ylim, smooth=20, show_rain=None, unit=None
 ########################################################################################################################
 def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None, unit=None, no_calc=False,
                      down_scale='5T', add_bounds=True, title=None, ylim=None, two_label_lines=True, ylabel=None,
-                     lang=LANG, split=True, middle_y=None):
+                     lang=LANG, split=True, middle_y=None, rasterized=True) -> plt.Figure:
     day = day_series.name
     # if day != 'Saturday':
     #     return
@@ -107,15 +119,15 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
-        ax = data_table_dry.T.plot(alpha=0.15, legend=False, color='saddlebrown', lw=1, ax=ax)
+        ax = data_table_dry.T.plot(alpha=0.15, legend=False, color='saddlebrown', lw=1, ax=ax, rasterized=rasterized)
         if split:
-            ax2 = data_table_dry.T.plot(alpha=0.15, legend=False, color='saddlebrown', lw=1, ax=ax2)
+            ax2 = data_table_dry.T.plot(alpha=0.15, legend=False, color='saddlebrown', lw=1, ax=ax2, rasterized=rasterized)
 
         wet = s[s.index.difference(dry.index)]
         data_table_wet = compare_daily_times_table(wet)
-        ax = data_table_wet.T.plot(alpha=0.15, legend=False, color='c', ax=ax, lw=1)
+        ax = data_table_wet.T.plot(alpha=0.15, legend=False, color='c', ax=ax, lw=1, rasterized=rasterized)
         if split:
-            ax2 = data_table_wet.T.plot(alpha=0.15, legend=False, color='c', ax=ax2, lw=1)
+            ax2 = data_table_wet.T.plot(alpha=0.15, legend=False, color='c', ax=ax2, lw=1, rasterized=rasterized)
         alpha = 0.3
     else:
         data_table = compare_daily_times_table(s)
@@ -185,14 +197,14 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
     return fig
 
 
-def diurnal_density_full(ts, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
+def diurnal_density_full(ts, major_freq='H', minor_freq='15T', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
-    ax = data_table.T.plot(alpha=0.05, legend=False, color='k')
+    ax = data_table.T.plot(alpha=alpha, legend=False, color='k', rasterized=rasterized)
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
 
 
-def weekly_density_plot(data, ax=None, add_mean=True, color='k', smooth=None):
+def weekly_density_plot(data, ax=None, add_mean=True, color='k', smooth=None) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_week_table(data.ts[data.day_category_index != '8 Holiday'].copy())
     ax = data_table.T.plot(alpha=0.05, legend=False, color=color, ax=ax, rasterized=True)
 
@@ -301,7 +313,7 @@ def stability_analysis(data, kind=1, var=False, lang=LANG):
 
 
 ########################################################################################################################
-def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
+def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -340,6 +352,20 @@ def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lin
 
     ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title, major_freq=major_freq, minor_freq=minor_freq)
     ax.set_ylim(ylim)
+    return ax.get_figure(), ax
+
+
+def compare_all_days(data: AnalyseData, smooth=None, major_freq='H', minor_freq='15T'):
+    data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_kind_detail=10, file_path=data.temp_file_path,
+                         make_temp_files=False, est_best_shift_time=False, smooth_window=data.smooth_window).set_number_day_labels()
+
+    mean = data10.dw_mean_table(smooth=data.smooth_window if smooth is None else smooth)
+
+    ax = None
+    for day in mean.columns:
+        ax = mean[day].plot(color=daykind_color(day), legend=True, ax=ax)
+
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
 
 
@@ -392,7 +418,8 @@ def dry_trend(data, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-W
 
 
 ########################################################################################################################
-def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=None, title=None, major_freq='H', minor_freq='15T') -> (plt.Figure, plt.Axes):
+def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=None, title=None,
+                                major_freq='H', minor_freq='15T', rasterized=True) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
@@ -404,7 +431,7 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
 
     # ------------
     data_table = compare_daily_times_table(diff)
-    ax = data_table.T.plot(alpha=0.05, legend=False, color='k', label='_nolegend_')
+    ax = data_table.T.plot(alpha=0.05, legend=False, color='k', label='_nolegend_', rasterized=rasterized)
     # ax.legend().remove()
     # ------------
     std = data_table.std().rolling(smooth, center=True, min_periods=1).mean()
@@ -432,11 +459,11 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
 
     lines_dict_ = get_legend_dict(ax)
     lines_dict_ = {k: v for k, v in lines_dict_.items() if not k.startswith('20')}
-    add_custom_legend(ax, lines_dict_, title='Confidence interval', bbox_to_anchor=(0., 1, 1., 0.), loc='lower left', ncol=3, )
+    add_custom_legend(ax, lines_dict_, title='Confidence interval', bbox_to_anchor=(0, 0, 1, 0), loc='lower left', ncol=3, )
 
     # ------------
     ax.set_title(f'{day} - Uncertainty')
-    # ax.get_figure().set_constrained_layout(True)
+    # ax.get_figure().set_layout_engine('constrained')
     # ax.get_figure().show()
     return ax.get_figure(), ax
 

@@ -1,13 +1,33 @@
-# kind
-MEDIAN__MAD = 0
-MEDIAN__PART_SPLIT_MAD = 6
-MEDIAN__FULL_SPLIT_MAD = 8
-MEDIAN__IQR = 97
-MEDIAN__SPLIT_IQR = 98
-ROB_MEAN__ROB_VAR = 1
-ROB_MEAN__MAD = 2
-ROB_MEAN__PART_SPLIT_MAD = 7
-MEAN__STD = 99
+# kind <> arithmetic
+MEDIAN__MAD = 0  # symmetrical
+MEDIAN__MAD_SPLIT_FULL = 8  # asymmetrical
+
+MEDIAN__MAD_SPLIT_PART = 6  # no use
+
+MEDIAN__IQR = 97  # no use
+MEDIAN__IQR_SPLIT = 98  # no use
+
+ROB_MEAN__ROB_VAR = 1  # no use
+ROB_MEAN__MAD = 2  # no use
+ROB_MEAN__MAD_SPLIT_PART = 7  # no use
+
+MEAN__STD = 99  # no use
+
+
+class ARITHMETIC:
+    MEDIAN__MAD = 0  # symmetrical
+    MEDIAN__MAD_SPLIT_FULL = 8  # asymmetrical
+
+    MEDIAN__MAD_SPLIT_PART = 6  # no use
+
+    MEDIAN__IQR = 97  # no use
+    MEDIAN__IQR_SPLIT = 98  # no use
+
+    ROB_MEAN__ROB_VAR = 1  # no use
+    ROB_MEAN__MAD = 2  # no use
+    ROB_MEAN__MAD_SPLIT_PART = 7  # no use
+
+    MEAN__STD = 99  # no use
 
 
 class MEAN_CALC:
@@ -18,9 +38,9 @@ class MEAN_CALC:
 
 class DEV_CALC:
     MAD = 'mad'
-    PART_SPLIT_MAD = 'part_split_mad'
-    FULL_SPLIT_MAD = 'full_split_mad'
+    MAD_SPLIT_PART = 'part_split_mad'
+    MAD_SPLIT_FULL = 'full_split_mad'
     IQR = 'iqr'
-    SPLIT_IQR = 'split_iqr'
+    IQR_SPLIT = 'split_iqr'
     STD = 'std'
     ROB_VAR = 'rob_var'
