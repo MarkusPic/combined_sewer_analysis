@@ -20,7 +20,7 @@ LANG = ENG
 
 
 ########################################################################################################################
-def diurnal_density(data, day_series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
+def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
                     major_freq='H', minor_freq='15T', rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     # Statistical Tests for Normality
     # from scipy.stats import *
@@ -87,7 +87,7 @@ def diurnal_density(data, day_series, ylim=None, ylab=None, smooth=20, show_rain
 
 
 ########################################################################################################################
-def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None, unit=None, no_calc=False,
+def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, smooth=20, criterion=None, unit=None, no_calc=False,
                      down_scale='5T', add_bounds=True, title=None, ylim=None, two_label_lines=True, ylabel=None,
                      lang=LANG, split=True, middle_y=None, rasterized=True) -> plt.Figure:
     day = day_series.name
@@ -197,14 +197,14 @@ def diurnal_density2(day_series, data, dry_data=None, smooth=20, criterion=None,
     return fig
 
 
-def diurnal_density_full(ts, major_freq='H', minor_freq='15T', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
+def diurnal_density_full(ts: pd.Series, major_freq='H', minor_freq='15T', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
     ax = data_table.T.plot(alpha=alpha, legend=False, color='k', rasterized=rasterized)
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
 
 
-def weekly_density_plot(data, ax=None, add_mean=True, color='k', smooth=None) -> tuple[plt.Figure, plt.Axes]:
+def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='k', smooth=None) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_week_table(data.ts[data.day_category_index != '8 Holiday'].copy())
     ax = data_table.T.plot(alpha=0.05, legend=False, color=color, ax=ax, rasterized=True)
 
@@ -246,7 +246,7 @@ def weekly_density_plot(data, ax=None, add_mean=True, color='k', smooth=None) ->
 
 
 ########################################################################################################################
-def stability_analysis(data, kind=1, var=False, lang=LANG):
+def stability_analysis(data: AnalyseData, kind=1, var=False, lang=LANG):
     time_dist = pd.DataFrame()
 
     groups = data.get_analysis_grouper()
@@ -313,7 +313,7 @@ def stability_analysis(data, kind=1, var=False, lang=LANG):
 
 
 ########################################################################################################################
-def compare_day(data, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
+def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -370,7 +370,7 @@ def compare_all_days(data: AnalyseData, smooth=None, major_freq='H', minor_freq=
 
 
 ########################################################################################################################
-def dry_percentage(data, unit=None, title=None, lang=LANG):
+def dry_percentage(data: AnalyseData, unit=None, title=None, lang=LANG):
     from scipy.stats import percentileofscore
 
     def calc_dry_perc(s):
@@ -390,7 +390,7 @@ def dry_percentage(data, unit=None, title=None, lang=LANG):
 
 
 ########################################################################################################################
-def dry_trend(data, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
+def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
               title=None, lang=LANG, mark_holidays=False):
     level = data.get_criterion_level_series(smooth_window=smooth_window).resample('D').mean()
     ax = level.plot(color=color)
@@ -418,23 +418,30 @@ def dry_trend(data, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-W
 
 
 ########################################################################################################################
-def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=None, title=None,
+def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None, unit=None, title=None,
                                 major_freq='H', minor_freq='15T', rasterized=True) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
-    dw_bool = data.get_dry_weather_bool().fillna(False)[day_series.index]
-    dw_cont = data.get_dw_continuum_series()[day_series.index]
-    ts_dw = day_series[dw_bool]
-    dw_cont_dw = dw_cont[dw_bool]
-    diff = ts_dw - dw_cont_dw
+    dw_bool_full = data.get_dry_weather_bool().fillna(False)
+    dw_bool_day = dw_bool_full[day_series.index]
+    ts_day_dw = day_series[dw_bool_day]
+
+    dw_cont_day = data.get_dw_continuum_series()[day_series.index]
+    dw_cont_day_dw = dw_cont_day[dw_bool_day]
+    diff_day = ts_day_dw - dw_cont_day_dw
+
+    dw_residuals_series_full = data.get_dw_residual_series(dw_bool_full)
+    dw_uncertainty_table = data.get_dw_uncertainty_table()
+    dw_residuals_series_day = dw_residuals_series_full[ts_day_dw.index]
 
     # ------------
-    data_table = compare_daily_times_table(diff)
+    data_table = compare_daily_times_table(diff_day)
     ax = data_table.T.plot(alpha=0.05, legend=False, color='k', label='_nolegend_', rasterized=rasterized)
     # ax.legend().remove()
     # ------------
-    std = data_table.std().rolling(smooth, center=True, min_periods=1).mean()
+    std_raw = data_table.std()
+    std = std_raw.rolling(smooth, center=True, min_periods=1).mean()
     interval_68 = std
     interval_95 = std * 2
     interval_99 = std * 3
@@ -468,6 +475,62 @@ def diurnal_uncertainty_density(data, day_series, smooth=20, ylim=None, unit=Non
     return ax.get_figure(), ax
 
 
+########################################################################################################################
+def compare_dw_uncertainty_day_absolute(data: AnalyseData, smooth=20,
+                                        major_freq='H', minor_freq='15T', unit='L/s') -> tuple[plt.Figure, plt.Axes]:
+
+    if data.day_kind_detail == 8:
+        data.set_number_day_labels()
+
+    # ---
+    uncertainty = data.get_dw_uncertainty_table(smooth=smooth)
+
+    # ---
+    ax: plt.Axes = None
+    for day in uncertainty.columns:
+        # print(day)
+        ax = uncertainty[day].plot(ax=ax, color=daykind_color(day), legend=True)
+
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
+
+    ax.set_title('absolute Uncertainty')
+
+    # ax.get_figure().show()
+
+    return ax.get_figure(), ax
+
+
+def compare_dw_uncertainty_day_relative(data: AnalyseData, smooth=20,
+                                        major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
+
+    if data.day_kind_detail == 8:
+        data.set_number_day_labels()
+
+    # ---
+    mean = data.dw_mean_table(smooth=smooth)
+    uncertainty = data.get_dw_uncertainty_table(smooth=smooth)
+
+    uncertainty_rel = uncertainty / mean
+
+    # ---
+    ax: plt.Axes = None
+    for day in uncertainty_rel.columns:
+        # print(day)
+        ax = uncertainty_rel[day].plot(ax=ax, color=daykind_color(day), legend=True)
+
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
+
+    ax.set_title('relative Uncertainty')
+
+    from matplotlib.ticker import PercentFormatter
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
+
+    # ax.get_figure().show()
+
+    return ax.get_figure(), ax
+
+
+########################################################################################################################
 AnalyseData.figure_diurnal_density = diurnal_density
 AnalyseData.figure_compare_day = compare_day
 AnalyseData.figure_dry_percentage = dry_percentage
@@ -476,7 +539,7 @@ AnalyseData.figure_stability_analysis = stability_analysis
 
 
 class AnalysePlots:
-    def __init__(self, data):
+    def __init__(self, data: AnalyseData):
         self._data = data
 
     def diurnal_density(self, day_series, ylim, smooth=20, show_rain=None, unit=None, title=None, lang=LANG):

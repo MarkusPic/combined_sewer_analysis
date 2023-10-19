@@ -710,7 +710,7 @@ class AnalyseData:
         })
 
         # ---
-        self.dry_weather_bool = rolling_diff2 <= (2*rolling_std2)
+        self.dry_weather_bool = rolling_diff2 <= (2 * rolling_std2)
 
         # Split your data into two parts: one with missing values and one without
         self.dry_weather_bool = self.dry_weather_bool.reindex(self.ts.index).rename(L.DW_BOOL)
@@ -837,11 +837,15 @@ class AnalyseData:
         return self.dry_continuum
 
     def get_dw_event_series(self, start, end):
+        # DW-continuum for evaluation of the algorithm
+        # resulted series is only from `start` to `end`
+
         regular = self.get_dw_mean_series(smooth=1).loc[start:end]
         criterion = self.get_criterion_series(smooth=1)
         # level = self.get_criterion_level_series()  # .round(1)
         var = self.get_dw_variance_series(smooth=1).loc[start:end]
 
+        # cut out of given timerange - so it has no influence to the result
         criterion[start:end] = np.NAN
 
         level = self._smooth_criterion(criterion, smooth=self.get_window_size(pd.Timedelta(days=2))).loc[start:end]
@@ -858,7 +862,7 @@ class AnalyseData:
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
     @smoother
-    def get_dry_filling_series(self, which: Literal[L.UPPER, L.LOWER, L.MEAN, L.AUTO]=L.MEAN):
+    def get_dry_filling_series(self, which: Literal[L.UPPER, L.LOWER, L.MEAN, L.AUTO] = L.MEAN):
         """
         Uses the measured time-series and fills wet-weather periods with estimated dry-weather values.
 
@@ -907,15 +911,16 @@ class AnalyseData:
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
     def get_dw_avail(self, window=pd.Timedelta(days=2), crit_limit=100):
+        # Verfügbarkeit von Criterium im TW-Bereich für die Berechnung von TW-Level
         if self.dry_weather_avail is None:
             dw_bool = self.get_dry_weather_bool(crit_limit=crit_limit)
-            window_num = self.get_window_size(window) # int(round(window / guess_freq(dw_bool.index)))
+            window_num = self.get_window_size(window)  # int(round(window / guess_freq(dw_bool.index)))
             roll = dw_bool.fillna(False).rolling(window_num, center=True, min_periods=int(window_num / 4))
             dry_weather_avail = roll.sum() / roll.count() * 100
             self.dry_weather_avail = dry_weather_avail.rename(L.DW_AVAILABILITY)
         return self.dry_weather_avail
 
-    def new_level(self):
+    def new_level(self):  # Alternative zu DW-LEVEL
         regular = self.get_dw_mean_series(smooth=1)
         cont = self.get_dw_continuum_series()
         return cont.div(regular)
@@ -925,8 +930,14 @@ class AnalyseData:
         return self.get_day_grouper().apply(lambda x: round(len(x) / 60 / 24, 1))
 
     # ------------------------------------------------------------------------------------------------------------------
+    def get_dw_residual_series(self, dw_bool=None):
+        if dw_bool is None:
+            dw_bool = slice(None)
+        return self.ts[dw_bool] - self.get_dw_continuum_series()[dw_bool]
+
     @timeit
-    def get_dw_uncertainty_table(self, min_rain_period=Timedelta(hours=2), extra_range=Timedelta(hours=4)):
+    @smoother
+    def get_dw_uncertainty_table(self, min_rain_period=None, extra_range=None):
         """
         Aggregate data für analysis groups and calculate the dry-weather uncertainty.
 
@@ -944,10 +955,7 @@ class AnalyseData:
             return self._read(fn)
         else:
             dw_bool = self.get_dry_weather_bool(min_rain_period=min_rain_period, extra_range=extra_range).fillna(False)
-            dw_cont = self.get_dw_continuum_series()
-            ts_dw = self.ts[dw_bool]
-            dw_cont_dw = dw_cont[dw_bool]
-            diff = ts_dw - dw_cont_dw
+            diff = self.get_dw_residual_series(dw_bool)
             grouper = diff.groupby([self.day_category_index[dw_bool], self.ts.index.time[dw_bool]])
             dw_uncertainty = grouper.std().unstack(0)
             self._write(dw_uncertainty, fn)
