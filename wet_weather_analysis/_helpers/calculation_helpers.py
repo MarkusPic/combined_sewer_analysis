@@ -3,6 +3,7 @@ from scipy.stats import iqr, gaussian_kde
 from scipy.optimize import minimize_scalar
 import numpy as np
 from datetime import time
+from ..definitions import *
 
 
 def mad(variation):
@@ -124,13 +125,13 @@ def robust_mean(_array):
 def _calc_dry_mean(_array, kind):
     array = _array[~np.isnan(_array)]
 
-    if kind in [0, 6, 8, 97, 98]:
+    if kind in ARITHMETIC.list_of_median:
         return np.median(array)
 
-    elif kind in [1, 2, 7]:
+    elif kind in ARITHMETIC.list_of_robust_mean:
         return robust_mean(array)
 
-    elif kind == 99:
+    elif kind == ARITHMETIC.MEAN__STD:
         return np.mean(array)
 
     else:
@@ -145,16 +146,16 @@ def calc_dry_mean(s, kind):
 def _calc_dry_variation(_variation, kind):
     variation = _variation[~np.isnan(_variation)]
 
-    if kind in [0, 2, 6, 7, 8]:
+    if kind in ARITHMETIC.list_of_mad:
         return mad(variation)
 
-    elif kind == 1:
+    elif kind == ARITHMETIC.ROB_MEAN__ROB_VAR:
         return robust_variance(variation)
 
-    elif kind == 99:
+    elif kind == ARITHMETIC.MEAN__STD:
         return np.std(variation)
 
-    elif kind == 97:
+    elif kind == ARITHMETIC.MEDIAN__IQR:
         # IQR
         return (np.percentile(variation, 75) - np.percentile(variation, 25)) / 2
 
@@ -179,12 +180,12 @@ def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False
     if not time_stamp:
         time_stamp = variation.index[0].time()
 
-    if kind in [6, 7] and (time_stamp > time(hour=7)) & (time_stamp < time(hour=12)):
+    if kind in (ARITHMETIC.MEDIAN__MAD_SPLIT_PART, ARITHMETIC.ROB_MEAN__MAD_SPLIT_PART) and (time_stamp > time(hour=7)) & (time_stamp < time(hour=12)):
         return split_mad(variation)
-    elif kind == 8:
+    elif kind == ARITHMETIC.MEDIAN__MAD_SPLIT_FULL:
         return split_mad(variation)
 
-    elif kind == 98:  # IQR
+    elif kind == ARITHMETIC.MEDIAN__IQR_SPLIT:  # IQR
         return variation.quantile(0.75), variation.quantile(0.25)
 
     else:
@@ -195,9 +196,9 @@ def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False
         return var, var
 
 
-def func_dry_variation(variation, kind, time_stamp=None, infer_mean=False):
-    upper, lower = calc_dry_variation_split(variation, kind, time_stamp=time_stamp, infer_mean=infer_mean)
-    return DataFrame({'UPPER': upper, 'LOWER': lower}, index=variation.index)
+# def func_dry_variation(variation, kind, time_stamp=None, infer_mean=False):
+#     upper, lower = calc_dry_variation_split(variation, kind, time_stamp=time_stamp, infer_mean=infer_mean)
+#     return DataFrame({'UPPER': upper, 'LOWER': lower}, index=variation.index)
 
 
 # def calc_criterion(s, limit, dry_mean, dry_upper_variance, dry_lower_variance, day_kind_detail):
@@ -219,35 +220,35 @@ def func_dry_variation(variation, kind, time_stamp=None, infer_mean=False):
 
 
 # @numba.jit
-def _calc_criterion(_array, kind, time_stamp, limit=1):
-    """
-
-    :rtype: np.ndarray
-    :type limit: float
-    :type time_stamp: datetime.time
-    :type kind: int
-    :type _array: np.ndarray
-    :param _array:
-
-    :param kind:
-    :param time_stamp:
-    :param limit:
-    :return:
-    """
-    dry_mean = _calc_dry_mean(_array, kind=kind)
-    diff = _array - dry_mean
-    upper_var, lower_var = calc_dry_variation_split(diff, kind=kind, time_stamp=time_stamp)
-    lower = np.invert(_array.astype(bool))
-    upper = lower.copy()
-    notna = ~np.isnan(_array)
-    lower[notna] = diff[notna] < 0
-    upper[notna] = diff[notna] > 0
-    crit = diff.copy()
-    crit[lower] = crit[lower] / lower_var
-    crit[upper] = crit[upper] / upper_var
-    return crit * 100 / limit
-
-
-def calc_criterion(s, kind, limit=1):
-    # return _calc_criterion(s.fillna(0).values, kind, limit=limit, time_stamp=s.index[0].time())
-    return _calc_criterion(s.values, kind, limit=limit, time_stamp=s.index[0].time())
+# def _calc_criterion(_array, kind, time_stamp, limit=1):
+#     """
+#
+#     :rtype: np.ndarray
+#     :type limit: float
+#     :type time_stamp: datetime.time
+#     :type kind: int
+#     :type _array: np.ndarray
+#     :param _array:
+#
+#     :param kind:
+#     :param time_stamp:
+#     :param limit:
+#     :return:
+#     """
+#     dry_mean = _calc_dry_mean(_array, kind=kind)
+#     diff = _array - dry_mean
+#     upper_var, lower_var = calc_dry_variation_split(diff, kind=kind, time_stamp=time_stamp)
+#     lower = np.invert(_array.astype(bool))
+#     upper = lower.copy()
+#     notna = ~np.isnan(_array)
+#     lower[notna] = diff[notna] < 0
+#     upper[notna] = diff[notna] > 0
+#     crit = diff.copy()
+#     crit[lower] = crit[lower] / lower_var
+#     crit[upper] = crit[upper] / upper_var
+#     return crit * 100 / limit
+#
+#
+# def calc_criterion(s, kind, limit=1):
+#     # return _calc_criterion(s.fillna(0).values, kind, limit=limit, time_stamp=s.index[0].time())
+#     return _calc_criterion(s.values, kind, limit=limit, time_stamp=s.index[0].time())

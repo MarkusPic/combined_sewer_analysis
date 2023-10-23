@@ -79,11 +79,18 @@ class AnalyseData:
     def __str__(self):
         return 'AnalyseData({}, kind={}, dkd={})'.format(self.name, self.arithmetic, self.day_kind_detail)
 
-    def __init__(self, ts, kind=ARITHMETIC.MEDIAN__MAD, limit=2.965, day_kind_detail=None, ww_crit_limit=100, dw_crit_limit=100,
-                 make_temp_files=False, file_path='.',
+    def __init__(self, ts,
+                 kind=ARITHMETIC.MEDIAN__MAD,
+                 limit=2.965,
+                 day_kind_detail=None,
+                 ww_crit_limit=100,
+                 dw_crit_limit=100,
+                 make_temp_files=False,
+                 file_path='.',
                  est_best_shift_time=True,
                  min_rain_period=Timedelta(hours=2),
-                 trail_period=Timedelta(hours=4), smooth_window=20):  # day_kind_detail=3.1, reference_time='00:00'
+                 trail_period=Timedelta(hours=4),
+                 smooth_window=20):
         """
         Analyse dry weather conditions in continuous flow and flux measurements.
 
@@ -290,10 +297,10 @@ class AnalyseData:
     @timeit
     def get_day_grouper(self):
         """
-        Get the daily groups depending from the level of detail of the analysis.
+        Get the daily groups depending on the level of detail of the analysis.
 
         Returns:
-            GroupBy: Data grouped by day-kind.
+            GroupBy: Timeseries grouped by day-kind.
         """
         if self._grouper_daily is None:
             fn = self.filename('day_group')
