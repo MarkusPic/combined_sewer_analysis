@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.ticker import PercentFormatter
 
 from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
@@ -9,12 +10,11 @@ from sww.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_leg
 from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
 from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
 
-from . import MEDIAN__MAD_SPLIT_FULL
+from .definitions import ARITHMETIC
 from ._helpers.debug_helpers import check
 from .date_analysis import get_school_holidays, get_holidays
 from ._class import AnalyseData, L
-from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation
-
+from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean
 
 LANG = ENG
 
@@ -246,41 +246,51 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='k', sm
 
 
 ########################################################################################################################
-def stability_analysis(data: AnalyseData, kind=1, var=False, lang=LANG):
-    time_dist = pd.DataFrame()
+def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Figure, plt.Axes):
+    """How much data is needed to achieve similar results as with all available data?"""
+    """every day is thrown into one pit. -> not good"""
+    if arithmetic is None:
+        arithmetic = data.arithmetic
 
-    groups = data.get_analysis_grouper()
-
-    # ---------------------------------------------------------------------------------
-    for g in groups.groups:
-        _, timestamp = g
+    # ---
+    res = {}
+    for (day_kind, timestamp), series in data.get_analysis_grouper():
+        # nur für volle Stunden
         if timestamp.minute != 0:
             continue
 
-        series = groups.get_group(g)
-        s = series.replace(0, np.NaN).dropna()
+        s = series.dropna()
 
-        new_dist = pd.Series(index=range(len(s)))
+        res_day_kind = []
 
-        final = calc_dry_mean(s, kind)
-        if var:
-            final = calc_dry_variation(s - final, kind=kind)
+        final = calc_dry_mean(s, arithmetic)
 
-        for n in range(5):
-            news = s.sample(frac=1, random_state=n).reset_index(drop=True)
+        if var:  # make plot for variation -> MAD
+            final = calc_dry_variation(s - final, kind=arithmetic)
 
-            for i in np.arange(5, len(s), 2):
-                x = news.iloc[0:i]
+        for seed in range(5):
+            # random sorting of values using 5 seeds
+            values_random = s.sample(frac=1, random_state=seed).values
 
-                recent = calc_dry_mean(x, kind)
+            res_seed = {}
+
+            for n_values in range(5, s.size, 2):
+                # n_values = portion of the random values (minimum:5, step=2)
+                values_random_pick = values_random[:n_values]
+
+                recent = _calc_dry_mean(values_random_pick, arithmetic)
                 if var:
-                    recent = calc_dry_variation(x - recent, kind)
+                    recent = calc_dry_variation(values_random_pick - recent, arithmetic)
 
-                new_dist.iloc[i] = (recent - final) / final * 100
+                res_seed[n_values] = (recent - final) / final
 
-            time_dist = pd.concat([time_dist, new_dist], axis=1)
-    # ---------------------------------------------------------------------------------
+            res_day_kind.append(res_seed)
+        res[(day_kind, timestamp)] = res_day_kind
 
+    # ---
+    time_dist = pd.concat([pd.DataFrame.from_records(r).rename_axis(index='random_state', columns='n_values').T.assign(day_kind=day_kind, timestamp=timestamp).set_index(['day_kind', 'timestamp'], append=True).unstack().unstack() for (day_kind, timestamp), r in res.items()], axis=1)
+
+    # ---
     upper_ranges = time_dist.quantile([0.995, 0.975, 0.95], axis=1).T
     upper_ranges = upper_ranges.rolling(4, min_periods=1, center=True).median().rolling(5, min_periods=1,
                                                                                         center=True).mean()
@@ -290,26 +300,27 @@ def stability_analysis(data: AnalyseData, kind=1, var=False, lang=LANG):
     lower_ranges = lower_ranges.rolling(4, min_periods=1, center=True).median().rolling(5, min_periods=1,
                                                                                         center=True).mean()
 
-    ax = upper_ranges.plot(color=['r', 'g', 'y'], legend=True)
+    ax: plt.Axes = upper_ranges.plot(color=['r', 'g', 'y'], legend=True)
     ax.legend(title='Described calculation steps')
-    ax = lower_ranges.plot(color=['y', 'g', 'r'], legend=False, ax=ax)
+    lower_ranges.plot(color=['y', 'g', 'r'], legend=False, ax=ax)
 
-    title = 'DW-Mean Stability Analysis\n' + args_to_string(kind=kind)
+    title = f'DW-Mean Stability Analysis\n[{arithmetic=}]'
 
     if var:
         title = title.replace('Mean', 'Variation')
 
-    ylim = (-20, 40)
-    if var:
-        ylim = (-100, 150)
-
-    ax.set_ylim(ylim)
-    ax.set_xlim(0)
-    ax.set_ylabel('Divergence to Final Result [%]')
+    ax.set_xlim(left=0)
+    ax.set_ylabel('Divergence to Final Result')
     ax.set_xlabel('Number of considered Data')
     ax.set_title(title, fontsize=12, fontweight='bold')
 
-    return ax.get_figure()
+    ax.axhline(0, lw=0.4, color='k', zorder=0)
+
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
+
+    ax.get_figure().show()
+
+    return ax.get_figure(), ax
 
 
 ########################################################################################################################
@@ -446,13 +457,13 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
     interval_95 = std * 2
     interval_99 = std * 3
 
-    ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label='68.3% (1 $\sigma$)')
+    ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label=r'68.3% (1 $\sigma$)')
     ax.plot(interval_68.index, interval_68, color='orange', ls='--', lw=0.75)
 
-    ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label='95.4% (2 $\sigma$)')
+    ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label=r'95.4% (2 $\sigma$)')
     ax.plot(interval_95.index, interval_95, color='red', ls='--', lw=0.75)
 
-    ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label='99.7% (3 $\sigma$)')
+    ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label=r'99.7% (3 $\sigma$)')
     ax.plot(interval_99.index, interval_99, color='darkviolet', ls='--', lw=0.75)
 
     # ------------
@@ -530,6 +541,59 @@ def compare_dw_uncertainty_day_relative(data: AnalyseData, smooth=20,
     return ax.get_figure(), ax
 
 
+def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_width=5):
+    import seaborn as sns
+    from mp.libs import fitter
+    import math
+    # ---
+    fig, (ax_dry, ax_wet) = plt.subplots(1, 2)  # type: plt.Figure, (plt.Axes, plt.Axes)
+
+    series_dw = series[dw_bool].copy()
+    bins = np.arange(math.floor(series_dw.min() / bin_width) * bin_width,
+                     math.ceil(series_dw.max() / bin_width) * bin_width + bin_width, bin_width)
+    # series_dw.hist(bins=bins, density=True, ax=ax_dry)
+
+    sns.histplot(x=series_dw, kde=True, ax=ax_dry, bins=bins)
+    # sns.kdeplot(data=tips, x="total_bill")
+    sns.rugplot(x=series_dw, ax=ax_dry)
+    ax_dry.set_title(f'DRY\nn={series_dw.size}')
+
+    fitter
+
+    series_ww = series[~dw_bool].copy()
+    bins = np.arange(math.floor(series_ww.min() / bin_width) * bin_width,
+                     math.ceil(series_ww.max() / bin_width) * bin_width + bin_width, bin_width)
+    # series_ww.hist(bins=bins, density=True, ax=ax_wet)
+    sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins)
+    sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
+    # sns.kdeplot(data=tips, x="total_bill")
+    # sns.rugplot(x=series_ww, ax=ax_wet)
+    ax_wet.set_title(f'WET\nn={series_ww.size}')
+
+    fig.suptitle(f'{day_kind} | {timestamp}')
+
+    fig.show()
+    return fig
+
+
+def compare_timestamp_distribution(data: AnalyseData):
+    dw_bool = data.get_dry_weather_bool_adv().astype(bool)
+    # crit = data.get_criterion_series()
+
+    groupby = data.ts.groupby(
+        [data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10), data.ts.index.time])
+
+    bin_width = 5
+
+    # ---
+
+    # ---
+
+    for (day_kind, timestamp), series in groupby:
+        dw_bool_ = dw_bool[series.index].copy()
+
+
+
 ########################################################################################################################
 AnalyseData.figure_diurnal_density = diurnal_density
 AnalyseData.figure_compare_day = compare_day
@@ -569,4 +633,4 @@ class AnalysePlots:
         return dry_trend(self._data, smooth_window=smooth_window, color=color, label=label, title=title, lang=lang)
 
     def stability_analysis(self, kind=1, var=False, lang=LANG):
-        return stability_analysis(self._data, kind=kind, var=var, lang=lang)
+        return stability_analysis(self._data, arithmetic=kind, var=var, lang=lang)
