@@ -558,40 +558,34 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
     sns.rugplot(x=series_dw, ax=ax_dry)
     ax_dry.set_title(f'DRY\nn={series_dw.size}')
 
-    fitter
+    # f = Fitter(deviations[day_kind],
+    #            xmin=-abs_range, xmax=abs_range, bins=40,
+    #            distributions=['chi2', 'lognorm', 'norm', ], timeout=60)
+    # f.fit()
+    # ax.plot(f.x, f.fitted_pdf['lognorm'], lw=1, label='lognorm', color='black')
 
     series_ww = series[~dw_bool].copy()
-    bins = np.arange(math.floor(series_ww.min() / bin_width) * bin_width,
-                     math.ceil(series_ww.max() / bin_width) * bin_width + bin_width, bin_width)
-    # series_ww.hist(bins=bins, density=True, ax=ax_wet)
-    sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins)
-    sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
-    # sns.kdeplot(data=tips, x="total_bill")
-    # sns.rugplot(x=series_ww, ax=ax_wet)
+
+    if not series_ww.empty:
+        bins = np.arange(math.floor(series_ww.min() / bin_width) * bin_width,
+                         math.ceil(series_ww.max() / bin_width) * bin_width + bin_width, bin_width)
+        # series_ww.hist(bins=bins, density=True, ax=ax_wet)
+        sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins)
+        sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
+        # sns.kdeplot(data=tips, x="total_bill")
+        # sns.rugplot(x=series_ww, ax=ax_wet)
     ax_wet.set_title(f'WET\nn={series_ww.size}')
 
     fig.suptitle(f'{day_kind} | {timestamp}')
 
-    fig.show()
+    # mean dw
+    # std dw
+    # median all
+    # mad all
+    # min und max dw und ww
+
+    # fig.show()
     return fig
-
-
-def compare_timestamp_distribution(data: AnalyseData):
-    dw_bool = data.get_dry_weather_bool_adv().astype(bool)
-    # crit = data.get_criterion_series()
-
-    groupby = data.ts.groupby(
-        [data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10), data.ts.index.time])
-
-    bin_width = 5
-
-    # ---
-
-    # ---
-
-    for (day_kind, timestamp), series in groupby:
-        dw_bool_ = dw_bool[series.index].copy()
-
 
 
 ########################################################################################################################
