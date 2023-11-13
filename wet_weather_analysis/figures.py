@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import PercentFormatter
+from scipy.stats import norm
 
 from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
@@ -10,11 +11,10 @@ from sww.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_leg
 from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
 from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
 
-from .definitions import ARITHMETIC
 from ._helpers.debug_helpers import check
 from .date_analysis import get_school_holidays, get_holidays
 from ._class import AnalyseData, L
-from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean
+from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean, mad
 
 LANG = ENG
 
@@ -39,14 +39,14 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
-        ax = data_table_dry.T.plot(alpha=0.05, legend=False, color='k', rasterized=rasterized)
+        ax = data_table_dry.T.plot(alpha=0.05, legend=False, color='black', rasterized=rasterized)
 
         wet = s[s.index.difference(dry.index)]
         data_table_wet = compare_daily_times_table(wet)
         ax = data_table_wet.T.plot(alpha=0.05, legend=False, color='cyan', ax=ax, rasterized=rasterized)
     else:
         data_table = compare_daily_times_table(s)
-        ax = data_table.T.plot(alpha=0.05, legend=False, color='k', rasterized=rasterized)
+        ax = data_table.T.plot(alpha=0.05, legend=False, color='black', rasterized=rasterized)
 
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
 
@@ -131,9 +131,9 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
         alpha = 0.3
     else:
         data_table = compare_daily_times_table(s)
-        ax = data_table.T.plot(alpha=0.05, legend=False, color='k', ax=ax)
+        ax = data_table.T.plot(alpha=0.05, legend=False, color='black', ax=ax)
         if split:
-            ax2 = data_table.T.plot(alpha=0.05, legend=False, color='k', ax=ax2)
+            ax2 = data_table.T.plot(alpha=0.05, legend=False, color='black', ax=ax2)
         alpha = 0.2
 
     title = make_title(title, default=get_diurnal_title(name=data.name, day=s.name))
@@ -176,8 +176,8 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
         ax2.set_yticks(list(ax2.get_yticks()) + [middle_y])
         ax2.set_ylim(bottom=middle_y)
         ax.set_ylim(bottom=0, top=middle_y)
-        # ax.axhline(middle_y, color='k')
-        # ax2.axhline(middle_y, color='k')
+        # ax.axhline(middle_y, color='black')
+        # ax2.axhline(middle_y, color='black')
         ax2.set_ylabel(cst_label(data.name, unit=unit, two_lines=two_label_lines), color='white')
 
         ax2 = translate_ax(ax2, lang=lang)
@@ -199,12 +199,12 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
 
 def diurnal_density_full(ts: pd.Series, major_freq='H', minor_freq='15T', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
-    ax = data_table.T.plot(alpha=alpha, legend=False, color='k', rasterized=rasterized)
+    ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
 
 
-def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='k', smooth=None) -> tuple[plt.Figure, plt.Axes]:
+def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black', smooth=None) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_week_table(data.ts[data.day_category_index != '8 Holiday'].copy())
     ax = data_table.T.plot(alpha=0.05, legend=False, color=color, ax=ax, rasterized=True)
 
@@ -314,7 +314,7 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
     ax.set_xlabel('Number of considered Data')
     ax.set_title(title, fontsize=12, fontweight='bold')
 
-    ax.axhline(0, lw=0.4, color='k', zorder=0)
+    ax.axhline(0, lw=0.4, color='black', zorder=0)
 
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
 
@@ -448,7 +448,7 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
 
     # ------------
     data_table = compare_daily_times_table(diff_day)
-    ax = data_table.T.plot(alpha=0.05, legend=False, color='k', label='_nolegend_', rasterized=rasterized)
+    ax = data_table.T.plot(alpha=0.05, legend=False, color='black', label='_nolegend_', rasterized=rasterized)
     # ax.legend().remove()
     # ------------
     std_raw = data_table.std()
@@ -556,7 +556,6 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
     sns.histplot(x=series_dw, kde=True, ax=ax_dry, bins=bins)
     # sns.kdeplot(data=tips, x="total_bill")
     sns.rugplot(x=series_dw, ax=ax_dry)
-    ax_dry.set_title(f'DRY\nn={series_dw.size}')
 
     # f = Fitter(deviations[day_kind],
     #            xmin=-abs_range, xmax=abs_range, bins=40,
@@ -571,18 +570,60 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
                          math.ceil(series_ww.max() / bin_width) * bin_width + bin_width, bin_width)
         # series_ww.hist(bins=bins, density=True, ax=ax_wet)
         sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins)
-        sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
+        # sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
         # sns.kdeplot(data=tips, x="total_bill")
         # sns.rugplot(x=series_ww, ax=ax_wet)
-    ax_wet.set_title(f'WET\nn={series_ww.size}')
 
-    fig.suptitle(f'{day_kind} | {timestamp}')
+    # ---
+    # stats
+    mean_dw = series_dw.mean()
+    std_dw = series_dw.std()
+    median_all = series.median()
+    mad_all = mad((series-median_all).dropna())
+    std_robust_all = mad_all/0.6745
+    min_dw = series_dw.min()
+    max_dw = series_dw.max()
 
-    # mean dw
-    # std dw
-    # median all
-    # mad all
-    # min und max dw und ww
+    # ---
+    # dw-border
+    min_ww = series_ww.min()
+    max_ww = series_ww.max()
+
+    # ---
+    # normal distribution plot with only DW data
+    x = np.linspace(min_dw, max_dw, 100)
+    p = norm.pdf(x, mean_dw, std_dw)
+    upper_lim = ax_dry.get_ylim()[1]
+    p = p/p.max()*upper_lim*0.9
+    ax_dry.plot(x, p, 'red', lw=2)
+    # ax_dry.axvline(mean_dw, color='r')
+
+    # ---
+    # normal distribution plot with robust metrics
+    p = norm.pdf(x, median_all, std_robust_all)
+    p = p/p.max()*ax_dry.get_ylim()[1]*0.9
+    ax_dry.plot(x, p, 'goldenrod', lw=2)
+    # ax_dry.axvline(median_all, color='goldenrod')
+
+    # ---
+    # 1,2,3 times standard deviation
+
+    # for dw-metrics
+    ax_dry.vlines([mean_dw + i*std_dw for i in range(-3, 4)], upper_lim*0.95, upper_lim, color='red')
+    ax_dry.vlines(mean_dw, upper_lim*0.95, upper_lim, color='red', lw=2)
+    # for robust-metrics
+    ax_dry.vlines([median_all + i * std_robust_all for i in range(-3, 4)], upper_lim * 0.95, upper_lim, color='goldenrod')
+    ax_dry.vlines(median_all, upper_lim * 0.95, upper_lim, color='goldenrod', lw=2)
+
+    # ---
+    ax_dry.set_ylim(top=upper_lim)
+    ax_dry.set_title(f'DRY\nn={series_dw.size}\n[{min_dw:0.0f} ... {max_dw:0.0f}]')
+
+    ax_wet.set_title(f'WET\nn={series_ww.size}\n[{min_ww:0.0f} ... {max_ww:0.0f}]')
+
+    fig.suptitle(f'{day_kind} | {timestamp}\n'
+                 f'mean$_{{dw}}$={mean_dw:0.1f} | std$_{{dw}}$={std_dw:0.1f}\n'
+                 f'median$_{{all}}$={median_all:0.1f} | std$_{{robust,all}}$={std_robust_all:0.1f}')
 
     # fig.show()
     return fig
