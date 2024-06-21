@@ -16,7 +16,7 @@ def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
     else:
         one_day = False
 
-    res = pd.DataFrame()
+    res = None
 
     if aggs is None:
         aggs = ['sum', 'mean']
@@ -25,7 +25,7 @@ def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
 
     for agg in aggs:
 
-        if agg is 'sum':
+        if agg == 'sum':
             if is_flow:
                 mean_ = mean.copy() / 1000 * 60
                 upper_ = upper.copy() / 1000 * 60
@@ -45,10 +45,11 @@ def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
                                'Max': upper_.apply(agg)}, name=name.format(agg))
             table = table[['Min', 'Mittel', 'Max']].copy()
         else:
-            table = pd.DataFrame()
-            table = table.append(lower_.apply(agg).rename('Min'))
-            table = table.append(mean_.apply(agg).rename('Mittel'))
-            table = table.append(upper_.apply(agg).rename('Max'))
+            table = pd.concat([
+                lower_.apply(agg).rename('Min'),
+                mean_.apply(agg).rename('Mittel'),
+                upper_.apply(agg).rename('Max')
+                               ], axis=1).T
             # table = table.applymap(round_sig)
             table['Art'] = name.format(agg)
 
@@ -62,6 +63,9 @@ def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
                 new_cols.append(','.join([''.join([s[:2] for s in name.split(' ')]) for name in names]))
             table.columns = new_cols
 
-        res = res.append(table)
+        if res is None:
+            res = table
+        else:
+            res = pd.concat([res, table])
 
     return res

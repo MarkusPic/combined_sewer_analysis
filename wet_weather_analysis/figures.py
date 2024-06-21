@@ -21,14 +21,14 @@ LANG = ENG
 
 ########################################################################################################################
 def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
-                    major_freq='H', minor_freq='15T', rasterized=True) -> tuple[plt.Figure, plt.Axes]:
+                    major_freq='h', minor_freq='15min', rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     # Statistical Tests for Normality
     # from scipy.stats import *
     # https://towardsdatascience.com/normality-tests-in-python-31e04aa4f411
 
     day = day_series.name
 
-    s = day_series.resample('5T').mean()
+    s = day_series.resample('5min').mean()
 
     if isinstance(show_rain, pd.Series):
         crit = show_rain.copy()
@@ -197,7 +197,7 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
     return fig
 
 
-def diurnal_density_full(ts: pd.Series, major_freq='H', minor_freq='15T', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
+def diurnal_density_full(ts: pd.Series, major_freq='h', minor_freq='15min', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
     ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
@@ -324,7 +324,7 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
 
 
 ########################################################################################################################
-def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
+def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='h', minor_freq='15min') -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -366,7 +366,7 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     return ax.get_figure(), ax
 
 
-def compare_all_days(data: AnalyseData, smooth=None, major_freq='H', minor_freq='15T'):
+def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min'):
     data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_kind_detail=10, file_path=data.temp_file_path,
                          make_temp_files=False, est_best_shift_time=False, smooth_window=data.smooth_window).set_number_day_labels()
 
@@ -430,7 +430,7 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
 
 ########################################################################################################################
 def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None, unit=None, title=None,
-                                major_freq='H', minor_freq='15T', rasterized=True) -> (plt.Figure, plt.Axes):
+                                major_freq='h', minor_freq='15min', rasterized=True) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
@@ -488,7 +488,7 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
 
 ########################################################################################################################
 def compare_dw_uncertainty_day_absolute(data: AnalyseData, smooth=20,
-                                        major_freq='H', minor_freq='15T', unit='L/s') -> tuple[plt.Figure, plt.Axes]:
+                                        major_freq='h', minor_freq='15min', unit='L/s') -> tuple[plt.Figure, plt.Axes]:
 
     if data.day_kind_detail == 8:
         data.set_number_day_labels()
@@ -512,7 +512,7 @@ def compare_dw_uncertainty_day_absolute(data: AnalyseData, smooth=20,
 
 
 def compare_dw_uncertainty_day_relative(data: AnalyseData, smooth=20,
-                                        major_freq='H', minor_freq='15T') -> tuple[plt.Figure, plt.Axes]:
+                                        major_freq='h', minor_freq='15min') -> tuple[plt.Figure, plt.Axes]:
 
     if data.day_kind_detail == 8:
         data.set_number_day_labels()
