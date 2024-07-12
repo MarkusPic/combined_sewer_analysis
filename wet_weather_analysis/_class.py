@@ -623,7 +623,7 @@ class AnalyseData:
         return self.dry_weather_span_table
 
     @timeit
-    def get_dry_weather_bool(self, min_rain_period=None, extra_range=None, fill_na=NaN):
+    def get_dry_weather_bool(self, min_rain_period=None, extra_range=None, fill_na=np.nan):
         """
         Mark wet weather periods (including a tail = extra_range) with False and dry weather periods as True.
 

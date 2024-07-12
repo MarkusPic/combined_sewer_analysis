@@ -34,7 +34,7 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
         crit = show_rain.copy()
 
         dry = s.copy()
-        dry.loc[crit > 100] = np.NaN
+        dry.loc[crit > 100] = np.nan
         dry.name = 'DRY_{}'.format(s.name)
 
         dry.dropna(inplace=True)
@@ -114,7 +114,7 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
         crit = criterion.copy()
 
         dry = s.copy()
-        dry.loc[crit > 100] = np.NaN
+        dry.loc[crit > 100] = np.nan
         dry.name = 'DRY_{}'.format(s.name)
 
         dry.dropna(inplace=True)

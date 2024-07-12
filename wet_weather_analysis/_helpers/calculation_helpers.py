@@ -135,7 +135,7 @@ def _calc_dry_mean(_array, kind):
         return np.mean(array)
 
     else:
-        return np.NaN
+        return np.nan
 
 
 def calc_dry_mean(s, kind):
@@ -160,7 +160,7 @@ def _calc_dry_variation(_variation, kind):
         return (np.percentile(variation, 75) - np.percentile(variation, 25)) / 2
 
     else:
-        return np.NaN
+        return np.nan
 
 
 def calc_dry_variation(s, kind):
