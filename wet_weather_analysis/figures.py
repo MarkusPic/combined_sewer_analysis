@@ -434,7 +434,7 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
     day = day_series.name
 
     # ------------
-    dw_bool_full = data.get_dry_weather_bool().fillna(False)
+    dw_bool_full = data.get_dry_weather_bool(fill_na=False)
     dw_bool_day = dw_bool_full[day_series.index]
     ts_day_dw = day_series[dw_bool_day]
 

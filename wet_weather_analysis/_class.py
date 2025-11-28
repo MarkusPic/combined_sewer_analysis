@@ -807,8 +807,8 @@ class AnalyseData:
         smooth = self.get_window_size(smooth_window)
         if self.criterion_level is None:
             criterion = self.get_criterion_series(smooth=1)
-            dw_bool = self.get_dry_weather_bool().fillna(False)
-            criterion[~dw_bool] = np.NAN
+            dw_bool = self.get_dry_weather_bool(fill_na=False)
+            criterion[~dw_bool] = np.nan
 
             self.criterion_level = self._smooth_criterion(criterion, smooth).rename(L.DW_LEVEL)
         return self.criterion_level.rolling(smooth, center=True, min_periods=1).mean()
@@ -852,7 +852,7 @@ class AnalyseData:
         var = self.get_dw_variance_series(smooth=1).loc[start:end]
 
         # cut out of given timerange - so it has no influence to the result
-        criterion[start:end] = np.NAN
+        criterion[start:end] = np.nan
 
         level = self._smooth_criterion(criterion, smooth=self.get_window_size(pd.Timedelta(days=2))).loc[start:end]
 
@@ -919,9 +919,9 @@ class AnalyseData:
     def get_dw_avail(self, window=pd.Timedelta(days=2), crit_limit=100):
         # Verfügbarkeit von Criterium im TW-Bereich für die Berechnung von TW-Level
         if self.dry_weather_avail is None:
-            dw_bool = self.get_dry_weather_bool(crit_limit=crit_limit)
+            dw_bool = self.get_dry_weather_bool(crit_limit=crit_limit, fill_na=False)
             window_num = self.get_window_size(window)  # int(round(window / guess_freq(dw_bool.index)))
-            roll = dw_bool.fillna(False).rolling(window_num, center=True, min_periods=int(window_num / 4))
+            roll = dw_bool.rolling(window_num, center=True, min_periods=int(window_num / 4))
             dry_weather_avail = roll.sum() / roll.count() * 100
             self.dry_weather_avail = dry_weather_avail.rename(L.DW_AVAILABILITY)
         return self.dry_weather_avail
@@ -960,7 +960,7 @@ class AnalyseData:
         if isfile(fn):
             return self._read(fn)
         else:
-            dw_bool = self.get_dry_weather_bool(min_rain_period=min_rain_period, extra_range=extra_range).fillna(False)
+            dw_bool = self.get_dry_weather_bool(min_rain_period=min_rain_period, extra_range=extra_range, fill_na=False)
             diff = self.get_dw_residual_series(dw_bool)
             grouper = diff.groupby([self.day_category_index[dw_bool], self.ts.index.time[dw_bool]])
             dw_uncertainty = grouper.std().unstack(0)
