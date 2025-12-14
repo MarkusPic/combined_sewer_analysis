@@ -268,24 +268,24 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
         dayofweek = index.dayofweek.values
 
         if level_of_detail == 2:
-            days = Series(index=index.floor('D'), data=WORKDAY)
+            days = Series(index=index.floor('d'), data=WORKDAY)
             days.loc[holidays | (dayofweek >= 5)] = NO_WORKDAY
 
         elif level_of_detail == 3:
-            days = Series(index=index.floor('D'), data=WORKDAY)
+            days = Series(index=index.floor('d'), data=WORKDAY)
             days.loc[dayofweek >= 5] = WEEKEND
             days.loc[holidays] = HOLIDAY
 
         elif level_of_detail == 3.1:
-            days = Series(index=index.floor('D'), data=WORKDAY)
+            days = Series(index=index.floor('d'), data=WORKDAY)
             days.loc[dayofweek == 5] = SATURDAY
             days.loc[holidays | (dayofweek == 6)] = SUN_HOLIDAY
 
         elif level_of_detail == 7:
-            days = Series(index=index.floor('D'), data=index.day_name())
+            days = Series(index=index.floor('d'), data=index.day_name())
 
         elif level_of_detail == 8:
-            days = Series(index=index.floor('D'), data=index.day_name())
+            days = Series(index=index.floor('d'), data=index.day_name())
             if add_number:
                 days = Series(index=days.index, data=dayofweek).add(1).astype(str).str.cat(days, sep=' ')
                 days.loc[holidays] = '8 ' + HOLIDAY
@@ -293,7 +293,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
                 days.loc[holidays] = HOLIDAY
 
         elif level_of_detail == 9:
-            days = Series(index=index.floor('D'), data=index.day_name())
+            days = Series(index=index.floor('d'), data=index.day_name())
             if add_number:
                 days = Series(index=days.index, data=dayofweek).add(1).astype(str).str.cat(days, sep=' ')
                 days.loc[holidays] = '8 ' + HOLIDAY
@@ -303,7 +303,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
                 days.loc[is_fake_friday(index)] = FAKE_FRIDAY
 
         elif level_of_detail == 10:
-            days = Series(index=index.floor('D'), data=index.day_name())
+            days = Series(index=index.floor('d'), data=index.day_name())
             if add_number:
                 days = Series(index=days.index, data=dayofweek).add(1).astype(str).str.cat(days, sep=' ')
                 days.loc[holidays] = '8 ' + HOLIDAY
@@ -315,7 +315,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
                 days.loc[is_bridge_day(index)] = BRIDGE_DAY
 
         else:
-            days = Series(index=index.floor('D'))
+            days = Series(index=index.floor('d'))
         # check('DayType1')
         # return pd.CategoricalIndex(days.values)
         return days.values

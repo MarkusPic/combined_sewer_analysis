@@ -9,17 +9,27 @@ from ..definitions import *
 def mad(variation):
     """
     median absolute deviation
-    :param variation: _np.array_ = values - mean_of_values
-    :return:
+
+    Args:
+        variation (np.ndarray | pd.Series): values - mean_of_values
+
+    Returns:
+        np.ndarray | pd.Series: MAD
     """
     return np.median(np.abs(variation))
 
 
 def mad_(series):
     """
-    median absolute deviation
-    :param variation: _np.array_ = values - mean_of_values
-    :return:
+    Median absolute deviation of the median of the series.
+
+    NaNs are allowed.
+
+    Args:
+        series (np.ndarray | pd.Series): values
+
+    Returns:
+        np.ndarray | pd.Series: MAD
     """
     median = np.nanmedian(series)
     return np.nanmedian(np.abs(series-median))
@@ -29,8 +39,12 @@ def split_mad(variation):
     """
     calculate split median absolute deviation
     median deviation split for values above and below the mean value
-    :param variation: _np.array_ = values - mean_of_values
-    :return:
+
+    Args:
+        variation (np.ndarray): deviations
+
+    Returns:
+        tuple[np.ndarray]: MAD for positive and negative deviations
     """
     return np.abs(np.median(variation[variation > 0])), np.abs(np.median(variation[variation < 0]))
 
@@ -45,18 +59,26 @@ def est_bins(a):
 def find_nearest(a, x):
     """
     get index of closest value in array
-    :param a: _np.array_
-    :param x: _num_
-    :return: _int_ index in array
+
+    Args:
+        a (np.ndarray | pd.Series): values:
+        x (float): value
+
+    Returns:
+        int: index of closest value in array
     """
     return np.abs(a - x).argmin()
 
 
 def robust_variance(variation):
     """
+    median absolute deviation
 
-    :param variation: _np.array_ = values - mean_of_values
-    :return:
+    Args:
+        variation (np.ndarray | pd.Series): values - mean_of_values
+
+    Returns:
+        np.ndarray | pd.Series:
     """
     a = np.sort(variation)
 
