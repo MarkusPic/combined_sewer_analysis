@@ -482,7 +482,7 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
 
     # ------------
     ax.set_title(f'{day} - Uncertainty')
-    # ax.get_figure().set_layout_engine('constrained')
+
     # ax.get_figure().show()
     return ax.get_figure(), ax
 
