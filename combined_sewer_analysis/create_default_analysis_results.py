@@ -5,12 +5,12 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.ticker import EngFormatter
 
-from wet_weather_analysis import AnalyseData
-from wet_weather_analysis.figures import (diurnal_density_full, compare_all_days, weekly_density_plot, diurnal_density,
-                                          diurnal_uncertainty_density, compare_dw_uncertainty_day_relative,
-                                          compare_dw_uncertainty_day_absolute, stability_analysis,
-                                          )
-from wet_weather_analysis.plots import compare_timestamp_distribution
+from combined_sewer_analysis import AnalyseData
+from combined_sewer_analysis.figures import (diurnal_density_full, compare_all_days, weekly_density_plot, diurnal_density,
+                                             diurnal_uncertainty_density, compare_dw_uncertainty_day_relative,
+                                             compare_dw_uncertainty_day_absolute, stability_analysis,
+                                             )
+from combined_sewer_analysis.plots import compare_timestamp_distribution
 
 
 def get_available_data_ratio(data: AnalyseData, pth: Path, level_of_detail=10):

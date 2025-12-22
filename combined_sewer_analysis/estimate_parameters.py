@@ -179,6 +179,6 @@ def est_best_shift_time(data: AnalyseData):
 
 
 def est_best_shift_time2(data: AnalyseData):
-    from wet_weather_analysis._helpers.calculation_helpers import mad_
+    from combined_sewer_analysis._helpers.calculation_helpers import mad_
     dev = data.ts.groupby(data.ts.index.time).agg(mad_)
     dev.plot().get_figure().show()

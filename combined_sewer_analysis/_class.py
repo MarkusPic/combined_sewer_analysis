@@ -264,7 +264,7 @@ class AnalyseData:
                 self._day_category_index = self._read(fn, dtype=pd.Series).values
             else:
                 if self.day_kind_detail == 'best':
-                    from wet_weather_analysis.estimate_parameters import est_best_daily_grouping
+                    from combined_sewer_analysis.estimate_parameters import est_best_daily_grouping
                     est_best_daily_grouping(self)
 
                 else:
@@ -755,7 +755,7 @@ class AnalyseData:
             c.dw_mean_table().plot().get_figure().show()
             c.dw_variance_table().plot().get_figure().show()
 
-            from wet_weather_analysis.figures import diurnal_density_full, weekly_density_plot
+            from combined_sewer_analysis.figures import diurnal_density_full, weekly_density_plot
             fig, ax = diurnal_density_full(criterion)
             fig.show()
 
