@@ -1,14 +1,14 @@
 from functools import wraps
-from os import path
 from pathlib import Path
-from sys import platform
+import sys
+import os
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 from pandas import Timedelta
-from pandas.core.groupby import GroupBy
 
+from sww.libs.timeseries.timezone.timeshift import tag_time_of_timeshift
 from ._helpers.debug_helpers import timeit, lev
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split, mad, mad_
 from ._helpers.pickle_helpers import read_pickle, write_pickle
@@ -22,7 +22,7 @@ from sww.libs.timeseries.stats.wastewater import calculate_load_rate
 
 
 def isfile(fn):
-    return path.isfile(f'{fn}.parq') or path.isfile(f'{fn}_{platform}.pkl')
+    return os.path.isfile(f'{fn}.parq') or os.path.isfile(f'{fn}_{sys.platform}.pkl')
 
 
 class L:
@@ -94,7 +94,7 @@ class AnalyseData:
         Analyse dry weather conditions in continuous flow and flux measurements.
 
         Args:
-            ts (pd.Seres):
+            ts (pd.Seres): with local timezone for diurnal pattern recognition.
             kind (int): 0,6,8,97,98,1,2,7,99
             limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather. 2.965 MAD = 2 std = 95%
             day_kind_detail (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
@@ -105,7 +105,11 @@ class AnalyseData:
             min_rain_period (Timedelta): Minimum duration from which it is a rain event. Shorter events will be ignored.
             trail_period (Timedelta): Duration for combining rain events + duration after an event to restore dw-conditions.
         """
-        self.ts = ts
+        self.ts = ts.copy()
+        # remove timezone info and remove timeshift range to not have a monotonic error or duplicates
+        self.ts.index = self.ts.index.tz_localize(None)
+        self.ts = self.ts[~tag_time_of_timeshift(self.ts.index)].copy()
+
         # kind of calculation method for the dw-mean and the dw-variance
         self.arithmetic = kind
         self.limit = limit
@@ -282,7 +286,7 @@ class AnalyseData:
         Groups data in [day, time] groups.
 
         Returns:
-            GroupBy: day-kind and time groups
+            pandas.core.groupby.GroupBy: day-kind and time groups
         """
         if self._grouper_analysis is None:
             fn = self.filename('analysis_group')
@@ -299,7 +303,7 @@ class AnalyseData:
         Get the daily groups depending on the level of detail of the analysis.
 
         Returns:
-            GroupBy: Timeseries grouped by day-kind.
+            pandas.core.groupby.GroupBy: Timeseries grouped by day-kind.
         """
         if self._grouper_daily is None:
             fn = self.filename('day_group')
@@ -1013,7 +1017,7 @@ class AnalyseData:
                 d.to_parquet(f'{fn}.parq', compression='brotli')
 
             else:
-                write_pickle(data, f'{fn}_{platform}.pkl')
+                write_pickle(data, f'{fn}_{sys.platform}.pkl')
 
             # global lev
             print(f'{lev}written: {fn}')
@@ -1023,7 +1027,7 @@ class AnalyseData:
         if self.make_temp_files:
             # check('read: ' + fn)
 
-            if path.isfile(f'{fn}.parq'):
+            if os.path.isfile(f'{fn}.parq'):
                 data = pd.read_parquet(f'{fn}.parq')
                 if data.columns.size == 1 and ((dtype is not None) and (dtype is pd.Series)):
                     data = data.iloc[:, 0].copy()
@@ -1031,11 +1035,11 @@ class AnalyseData:
                     data.columns = pd.MultiIndex.from_tuples([col.split('/') for col in data.columns])
                 return data
 
-            elif path.isfile(f'{fn}_{platform}.pkl'):
+            elif os.path.isfile(f'{fn}_{sys.platform}.pkl'):
                 try:
-                    return read_pickle(f'{fn}_{platform}.pkl')
+                    return read_pickle(f'{fn}_{sys.platform}.pkl')
                 except AttributeError as e:
-                    raise IOError(f'Can\'t read "{fn}_{platform}.pkl": has an erroneous attribute!')
+                    raise IOError(f'Can\'t read "{fn}_{sys.platform}.pkl": has an erroneous attribute!')
 
     # def dw_periods(self, allowed_anomalies=4, minimum_duration=pd.Timedelta(hours=5)):
     #     criterion = self.get_criterion(limit=self.limit)
