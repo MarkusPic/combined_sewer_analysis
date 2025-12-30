@@ -34,3 +34,8 @@ class ARITHMETIC:
 #     IQR_SPLIT = 'split_iqr'
 #     STD = 'std'
 #     ROB_VAR = 'rob_var'
+
+MAD_TO_STD = 0.6745  # mad/std
+STD_TO_MAD = 1 / MAD_TO_STD  # std = mad * 1.4826
+
+# 2 x σ = 2.965 x MAD ... -> 95%

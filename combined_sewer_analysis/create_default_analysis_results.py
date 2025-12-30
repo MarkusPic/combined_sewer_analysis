@@ -15,7 +15,7 @@ from combined_sewer_analysis.plots import compare_timestamp_distribution
 
 def get_available_data_ratio(data: AnalyseData, pth: Path, level_of_detail=10):
     res = {}
-    dw_bool = data.get_dry_weather_bool_adv()
+    dw_bool = data.get_dw_bool_series_adv()
     crit = data.get_criterion_series()
 
     groupby = data.ts.groupby([data.get_diff_day_type(data._shifted_ts.index, level_of_detail=level_of_detail), data.ts.index.time])
@@ -57,7 +57,7 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
     # plot alle tagesgang kurven übereinandergelegt
     fn = pth / 'diurnal_density_full.png'
     if override or not fn.is_file():
-        fig, ax = diurnal_density_full(data_class.ts, major_freq='H', minor_freq='15T', alpha=0.01)
+        fig, ax = diurnal_density_full(data_class.ts, major_freq='1h', minor_freq='15min', alpha=0.01)
         ax.set_ylim(*ylim)
         ax.yaxis.set_major_formatter(EngFormatter(unit=unit))  # , places=0
         fig.savefig(fn)
@@ -67,7 +67,7 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
     # plot tagesgang mittelwert für alle tageskategorien
     fn = pth / 'compare_all_days.png'
     if override or not fn.is_file():
-        fig, ax = compare_all_days(data_class, major_freq='H', minor_freq='15T')
+        fig, ax = compare_all_days(data_class, major_freq='1h', minor_freq='15min')
         ax.set_ylim(*ylim)
         ax.yaxis.set_major_formatter(EngFormatter(unit=unit))  # , places=0
         fig.savefig(fn)
@@ -116,7 +116,7 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
     # plot absolute TW-Unsicherheit für alle tageskategorien
     fn = pth / 'compare_dw_uncertainty_day_absolute.png'
     if override or not fn.is_file():
-        fig, ax = compare_dw_uncertainty_day_absolute(data_class, major_freq='H', minor_freq='15T')
+        fig, ax = compare_dw_uncertainty_day_absolute(data_class, major_freq='1h', minor_freq='15min')
         ax.yaxis.set_major_formatter(EngFormatter(unit=unit))  # , places=0
         fig.savefig(fn)
         plt.close()
@@ -125,7 +125,7 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
     # plot relative TW-Unsicherheit für alle tageskategorien
     fn = pth / 'compare_dw_uncertainty_day_relative.png'
     if override or not fn.is_file():
-        fig, ax = compare_dw_uncertainty_day_relative(data_class, major_freq='H', minor_freq='15T')
+        fig, ax = compare_dw_uncertainty_day_relative(data_class, major_freq='1h', minor_freq='15min')
         fig.savefig(fn)
         plt.close()
 

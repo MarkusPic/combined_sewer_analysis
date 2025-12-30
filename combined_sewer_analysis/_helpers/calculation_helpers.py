@@ -202,7 +202,7 @@ def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False
     if not time_stamp:
         time_stamp = variation.index[0].time()
 
-    if kind in (ARITHMETIC.MEDIAN__MAD_SPLIT_PART, ARITHMETIC.ROB_MEAN__MAD_SPLIT_PART) and (time_stamp > time(hour=7)) & (time_stamp < time(hour=12)):
+    if kind in (ARITHMETIC.MEDIAN__MAD_SPLIT_PART, ARITHMETIC.ROB_MEAN__MAD_SPLIT_PART) and (time_stamp > time(hour=6)) & (time_stamp < time(hour=10)):
         return split_mad(variation)
     elif kind == ARITHMETIC.MEDIAN__MAD_SPLIT_FULL:
         return split_mad(variation)

@@ -9,7 +9,7 @@ def est_best_daily_grouping(data: AnalyseData):
     data.day_kind_detail = 9  # temporary
     est_best_shift_time(data)
     data.get_analysis_grouper()
-    all_means = data.dw_mean_table()
+    all_means = data.get_dw_mean_table()
 
     """
     from mp.libs.timeseries.plots.plotly_interface import PlotlyAxes
@@ -117,7 +117,7 @@ def est_best_shift_time(data: AnalyseData):
     else:
 
         data.get_analysis_grouper()
-        all_means = data.dw_mean_table()
+        all_means = data.get_dw_mean_table()
         diff = pd.Series(index=all_means.index, data=0)
         cols = all_means.columns.tolist()
         for col in cols:

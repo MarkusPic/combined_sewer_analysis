@@ -3,7 +3,7 @@ from ._class import L
 
 
 def dw_loads_table(data, is_flow=False, aggs=None, name='TW-Tages-{}'):
-    mean = data.dw_mean_table()
+    mean = data.get_dw_mean_table()
     agg_dry_bound = data.get_dw_bound_table()
     upper = agg_dry_bound[L.UPPER]
     lower = agg_dry_bound[L.LOWER]
