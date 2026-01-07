@@ -1,9 +1,10 @@
 import calendar
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.ticker import PercentFormatter
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter, EngFormatter
+import matplotlib.colors as mcolors
 from scipy.stats import norm
 
 from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
@@ -201,11 +202,34 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
     return fig
 
 
-def diurnal_density_full(ts: pd.Series, major_freq='h', minor_freq='15min', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
+def diurnal_density_full(ts: pd.Series, major_freq='1h', minor_freq='15min', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
     ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
+
+
+def diurnal_density_full_heatmap(ts: pd.Series, major_freq='1h', minor_freq='15min', ymin=0, ymax=100, ybins=100):
+    fig, ax = plt.subplots()
+    _ = ax.hist2d(ts.index.hour * 60*60 + ts.index.minute*60, ts, norm=mcolors.LogNorm(), cmap='Greys',
+                  range=[[xmin := 0, xmax := 1440*60], [ymin := ts.min(), ymax := ts.max()]],
+                  bins=[288, ybins]
+                  )
+    ax.set_ylim(int(ts.min()), int(ts.max()))
+
+    fig.colorbar(ax.collections[0], ax=ax, location='right',
+                 label='Count', pad=0.01, shrink=0.5,  # aspect=20
+                 # ticks=[0,1,2,3,4,5]
+                 )
+    ax.set_xticks(range(0, 1441*60, int(pd.Timedelta(major_freq) / pd.Timedelta(seconds=1))))
+    # major_ticks = pd.date_range("00:00", "23:59", freq=major_freq).append(pd.DatetimeIndex(['23:59:59.999999']))
+    # ax.set_xticklabels(major_ticks)
+
+    from idf_analysis.little_helpers import duration_steps_readable
+    ax.set_xticklabels(duration_steps_readable(ax.get_xticks()/60))
+
+    ax.set_xticks(range(0, 1440*60, int(pd.Timedelta(minor_freq) / pd.Timedelta(seconds=1))), minor=True)
+    return fig, ax
 
 
 def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black', smooth=None) -> tuple[plt.Figure, plt.Axes]:
@@ -252,6 +276,50 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
     ax = weekly_x_axes(ax, sunday_first=False)  # , custom_switch_time='00:00', start = data7_mean.index[0], data7_mean.index[-1])
     ylim = get_ylim(data.ts)
     ax.set_ylim(ylim)
+    return ax.get_figure(), ax
+
+
+def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap='Greys', smooth=None, xbins=500, ybins=100, ymax=100, add_colorbar=False) -> tuple[plt.Figure, plt.Axes]:
+    li_weekdays = list(calendar.day_name)
+    ts_normal_week = data.ts[np.isin(data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
+    ts_normal_week = ts_normal_week[ts_normal_week < ymax]
+    sec = ts_normal_week.index.weekday*24*60*60 + ts_normal_week.index.hour*60*60 + ts_normal_week.index.minute*60 + ts_normal_week.index.second
+
+    fig, ax = plt.subplots()
+    _ = ax.hist2d(sec*1e9, ts_normal_week, norm=mcolors.LogNorm(), cmap=cmap,
+                  range=[[xmin:=0, xmax:=1440*60*7*1e9], [ymin:=ts_normal_week.min(), ymax:=ts_normal_week.max()]],
+                  bins=[xbins, ybins]
+                  )
+    ax.set_ylim(int(ts_normal_week.min()), int(ts_normal_week.max()))
+
+    if add_colorbar:
+        fig.colorbar(ax.collections[0], ax=ax, location='right',
+                     label='Count', pad=0.01, shrink=0.5,  # aspect=20
+                     # ticks=[0,1,2,3,4,5]
+                     )
+
+    ax.set_title('Weekly')
+
+    if add_mean:
+        data7_mean = data.get_dw_mean_table(smooth=None).copy()
+
+        data7_mean2 = data7_mean.copy()
+        data7_mean2.index = pd.to_timedelta([i.hour for i in data7_mean2.index], unit='h') + \
+                            pd.to_timedelta([i.minute for i in data7_mean2.index], unit='m')
+
+        data7_mean2 = data7_mean2[li_weekdays]
+
+        data7_mean2.columns = pd.timedelta_range(start=pd.Timedelta(0), end=pd.Timedelta(days=6), freq='d')
+
+        meas = data7_mean2.stack(0).sort_index(level=1)
+        meas.index = meas.index.get_level_values(0) + meas.index.get_level_values(1)
+        meas.index = meas.index.total_seconds()*1e9
+        if smooth is not None:
+            meas = meas.rolling(smooth).mean()
+        ax = meas.rename('Mittelwert').plot(ax=ax, color='red', lw=2, legend=True)
+
+    ax = weekly_x_axes(ax, sunday_first=False)  # , custom_switch_time='00:00', start = data7_mean.index[0], data7_mean.index[-1])
+
     return ax.get_figure(), ax
 
 
@@ -376,13 +444,12 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     return ax.get_figure(), ax
 
 
-def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min'):
+def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min', ax=None):
     data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_kind_detail=10, file_path=data.temp_file_path,
                          make_temp_files=False, est_best_shift_time=False, smooth_window=data.smooth_window)#.set_number_day_labels()
 
     mean = data10.get_dw_mean_table(smooth=data.smooth_window if smooth is None else smooth)
 
-    ax = None
     for day in DAY_KIND.sorter(mean.columns):
         ax = mean[day].plot(color=daykind_color(day), legend=True, ax=ax)
 
