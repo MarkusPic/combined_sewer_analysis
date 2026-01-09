@@ -196,7 +196,7 @@ def get_kind_of_day(time_stamp, level_of_detail=3):
 
     Args:
         time_stamp (pandas.Timestamp):
-        level_of_detail (int): in how much categories the dates will be differentiated
+        level_of_detail (int): in how many categories the dates will be differentiated
 
     Returns:
         str: category of the day
@@ -226,6 +226,16 @@ def get_kind_of_day(time_stamp, level_of_detail=3):
         else:
             return DAY_KIND.WORKDAY
 
+    elif level_of_detail == 3.11:  # Metadier et. al 2011
+        day = get_kind_of_day(time_stamp, level_of_detail=2)
+        if day == DAY_KIND.WORKDAY:
+            if is_school_holiday(day):
+                return day + ' (inside school holidays)'
+            else:
+                return day + ' (outside school holidays)'
+        else:
+            return day
+
     elif level_of_detail == 8:
         if is_holiday(time_stamp):
             return DAY_KIND.HOLIDAY
@@ -251,7 +261,7 @@ def get_kind_of_day(time_stamp, level_of_detail=3):
             return time_stamp.day_name()
 
 
-def diff_day_type(index, level_of_detail=3., add_number=False):
+def diff_day_type(index, level_of_detail=3., add_number=False, as_series=False):
     """
     Get labels for the kind of the day.
 
@@ -259,6 +269,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
         index (pandas.Timestamp | pandas.DatetimeIndex):
         level_of_detail (int | float): in how many categories the dates will be differentiated
         add_number (bool): if the number of the day should be added if the dates will be differentiated in the weekdays
+        as_series (bool): if True, return a Series object
 
     Returns:
         str | pandas.Series: categories of the dates
@@ -287,6 +298,13 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
             days = Series(index=index.floor('d'), data=DAY_KIND.WORKDAY)
             days.loc[dayofweek == 5] = DAY_KIND.SATURDAY
             days.loc[holidays | (dayofweek == 6)] = DAY_KIND.SUN_HOLIDAY
+
+        elif level_of_detail == 3.11:  # Metadier et. al 2011
+            days = diff_day_type(index, level_of_detail=2)
+            bool_school_holiday = is_school_holiday(index)
+            days[bool_school_holiday & (days == 'Workday')] += ' (inside school holidays)'
+            days[~bool_school_holiday & (days == 'Workday')] += ' (outside school holidays)'
+            days = pd.Series(pd.Categorical(days), index=index)
 
         elif level_of_detail == 7:
             days = Series(index=index.floor('d'), data=index.day_name())
@@ -325,4 +343,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False):
             days = Series(index=index.floor('d'))
         # check('DayType1')
         # return pd.CategoricalIndex(days.values)
+        if as_series:
+            return pd.Series(index=index, data=days.values)
+
         return days.values

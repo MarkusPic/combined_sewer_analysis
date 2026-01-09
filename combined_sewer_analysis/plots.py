@@ -13,7 +13,7 @@ def compare_timestamp_distribution(data: AnalyseData, pth: Path):
     # pro Zeitpunkt und Tageskategorie
     # TW und RW getrennt
 
-    dw_bool = data.get_dw_bool_series_adv().astype(bool)
+    dw_bool = data.get_dw_bool_series(fill_na=False).astype(bool)
     # crit = data.get_criterion_series()
 
     groupby = data.ts.groupby(

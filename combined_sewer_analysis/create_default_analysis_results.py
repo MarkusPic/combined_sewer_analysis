@@ -15,7 +15,7 @@ from combined_sewer_analysis.plots import compare_timestamp_distribution
 
 def get_available_data_ratio(data: AnalyseData, pth: Path, level_of_detail=10):
     res = {}
-    dw_bool = data.get_dw_bool_series_adv()
+    dw_bool = data.get_dw_bool_series()
     crit = data.get_criterion_series()
 
     groupby = data.ts.groupby([data.get_diff_day_type(data._shifted_ts.index, level_of_detail=level_of_detail), data.ts.index.time])

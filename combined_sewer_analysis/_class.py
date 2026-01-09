@@ -18,7 +18,6 @@ from sww.libs.timeseries.stats.events import combine_events, span_table, event_d
 from sww.libs.timeseries.stats.events_converter import mark_event_bool
 from sww.libs.timeseries.stats.freqs import guess_freq
 from sww.libs.timeseries.stats.wastewater import calculate_load_rate
-from sww.libs.timeseries.timezone.timeshift import tag_time_of_timeshift
 
 
 def isfile(fn):
@@ -50,6 +49,7 @@ def smoother(method):
             smooth = kwargs.pop('smooth')
         else:
             # attribute of AnalyseData
+            args[0]  # type: AnalyseData
             smooth = args[0].smooth_window
 
         result = method(*args, **kwargs)  # type: pd.Series
@@ -93,7 +93,7 @@ class AnalyseData:
                  dw_crit_limit=100,
                  make_temp_files=False,
                  file_path='.',
-                 est_best_shift_time=True,
+                 est_best_shift_time=False,
                  shift_delta=None,
                  min_rain_period=Timedelta(hours=2),
                  trail_period=Timedelta(hours=4),
@@ -544,8 +544,94 @@ class AnalyseData:
             self.criterion = self._calc_criterion()
         return self.criterion.divide(limit or self.limit)
 
+    def get_dw_bool_series(self, fill_na=np.nan, no_cache=False):
+        if no_cache or self._dw_bool_series is None:
+            smooth_window = self.dry_level_window
+            smooth = self.get_window_size(smooth_window)
+            _rolling_kwargs = dict(window=smooth, center=True, min_periods=int(smooth / 4))
+
+            criterion = self.get_criterion_series(smooth=1)
+
+            # ---
+            dw_bool_simple = criterion.abs() < self.dw_crit_limit
+
+            # ---
+            rolling_mean = criterion.where(dw_bool_simple).rolling(**_rolling_kwargs).median()
+
+            rolling_diff = criterion - rolling_mean
+            rolling_std = rolling_diff.where(dw_bool_simple).abs().rolling(**_rolling_kwargs).median() * STD_TO_MAD
+
+            # ---
+            dw_bool_simple_adv = rolling_diff.abs() <= (2.5 * rolling_std)
+
+            # ---
+            rolling_mean2 = criterion.where(dw_bool_simple_adv).rolling(**_rolling_kwargs).median()
+
+            rolling_diff2 = criterion - rolling_mean2
+            rolling_std2 = rolling_diff2.where(dw_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * STD_TO_MAD
+
+            # ---
+            # self._interim_dw_bool_adv = pd.DataFrame({
+            #     '_rolling_mean': rolling_mean,
+            #     '_rolling_diff': rolling_diff,
+            #     '_rolling_std': rolling_std,
+            #     '_rolling_mean2': rolling_mean2,
+            #     '_rolling_diff2': rolling_diff2,
+            #     '_rolling_std2': rolling_std2,
+            # })
+
+            # ---
+            dw_bool_series = rolling_diff2 <= (2.5 * rolling_std2)
+
+            # Split your data into two parts: one with missing values and one without
+            dw_bool_series = dw_bool_series.reindex(self.ts.index).rename(L.DW_BOOL)
+            self._dw_bool_series = dw_bool_series
+
+            if no_cache:
+                return dw_bool_series
+            else:
+                self._dw_bool_series = dw_bool_series.rename(L.DW_BOOL)
+
+        return self._dw_bool_series.mask(self.ts.isnull(), fill_na)
+
     # ------------------------------------------------------------------------------------------------------------------
     def get_wet_weather_events(self, min_rain_period=None, trail_period=None, no_cache=False):
+        """
+        Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
+
+        *first estimation*
+
+        Event definition:
+            Value must be greate than the expected DW-range.
+
+        Gaps (NaN) in the timeseries will be defaulted to dry weather.
+
+        Args:
+            min_rain_period (Timedelta): Minimum duration that counts as a rain event / wet weather period.
+            trail_period (Timedelta): Nachlaufzeit | minimum duration to separate following events.
+            no_cache (bool): get events from scratch
+
+        Returns:
+            pd.DataFrame: events with start and end times
+        """
+        if no_cache or self._wet_weather_events is None:
+            # NaNs are assumed to be dry weather
+            criterion_bool = ~self.get_dw_bool_series(fill_na=True)
+
+            wet_weather_table = span_table(span_bool=criterion_bool)
+            # it is only a wet-weather-event when it is longer than "min_rain_period"
+
+            wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= (min_rain_period or self.min_rain_period)]
+
+            # combine close events
+            wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period or self.trail_period)
+            if no_cache:
+                return wet_weather_table
+            else:
+                self._wet_weather_events = wet_weather_table
+        return self._wet_weather_events
+
+    def get_wet_weather_events_v1(self, min_rain_period=None, trail_period=None):
         """
         Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
 
@@ -563,24 +649,20 @@ class AnalyseData:
         Returns:
             pd.DataFrame: events with start and end times
         """
-        if no_cache or self._wet_weather_events is None:
-            # NaNs are assumed to be dry weather
-            criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
+        # NaNs are assumed to be dry weather
+        criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
 
-            wet_weather_table = span_table(span_bool=criterion_bool)
-            # it is only a wet-weather-event when it is longer than "min_rain_period"
+        wet_weather_table = span_table(span_bool=criterion_bool)
+        # it is only a wet-weather-event when it is longer than "min_rain_period"
 
-            wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= (min_rain_period or self.min_rain_period)]
+        wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= (min_rain_period or self.min_rain_period)]
 
-            # combine close events
-            wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period or self.trail_period)
-            if no_cache:
-                return wet_weather_table
-            else:
-                self._wet_weather_events = wet_weather_table
-        return self._wet_weather_events
+        # combine close events
+        wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period or self.trail_period)
 
-    def get_wet_weather_events_v2(self, min_rain_period=None, trail_period=None, no_cache=False):
+        return wet_weather_table
+
+    def get_wet_weather_events_v2(self, min_rain_period=None, trail_period=None):
         """
         Get table with wet weather events with a minimum period and combine events which are closer than a tail period.
 
@@ -598,22 +680,17 @@ class AnalyseData:
         Returns:
             pd.DataFrame: events with start and end times
         """
-        if no_cache or self._wet_weather_events is None:
-            # NaNs are assumed to be dry weather
-            criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
+        # NaNs are assumed to be dry weather
+        criterion_bool = self.ts > (self.get_dw_continuum_series() + self.get_dw_uncertainty_series()*2)
 
-            wet_weather_table = span_table(span_bool=criterion_bool)
-            # it is only a wet-weather-event when it is longer than "min_rain_period"
+        wet_weather_table = span_table(span_bool=criterion_bool)
+        # it is only a wet-weather-event when it is longer than "min_rain_period"
 
-            wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= (min_rain_period or self.min_rain_period)]
+        wet_weather_table = wet_weather_table[event_duration(wet_weather_table) >= (min_rain_period or self.min_rain_period)]
 
-            # combine close events
-            wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period or self.trail_period)
-            if no_cache:
-                return wet_weather_table
-            else:
-                self._wet_weather_events = wet_weather_table
-        return self._wet_weather_events
+        # combine close events
+        wet_weather_table = combine_events(wet_weather_table, new_event_after=trail_period or self.trail_period)
+        return wet_weather_table
 
     def get_dry_weather_events(self, min_dry_period=None):
         """
@@ -632,26 +709,52 @@ class AnalyseData:
         """
         if self._dry_weather_events is None:
             # NaNs are assumed to be wet weather
-            criterion_bool = self.get_criterion_series().fillna(self.dw_crit_limit+1) < self.dw_crit_limit
+            criterion_bool = self.get_dw_bool_series(fill_na=False)
 
             dry_weather_table = span_table(span_bool=criterion_bool)
 
             # it is only a dw event (period) when it is longer than "min_dry_period" dry.
             dry_weather_table = dry_weather_table[event_duration(dry_weather_table) >= (min_dry_period or self.min_dry_period)]
 
+            # TODO: combine dry weather if short peak with lower than 100 crit
+            # dry_weather_table = combine_events(dry_weather_table, new_event_after=trail_period or self.trail_period)
+
             self._dry_weather_events = dry_weather_table
         return self._dry_weather_events
 
+    def get_dry_weather_events_v1(self, min_dry_period=None):
+        """
+        Get table with dry weather period with a minimum period.
+
+        Gaps (NaN) in the timeseries will be defaulted to wet weather.
+
+        Event definition:
+            Value must be less than the expected DW-range
+
+        Args:
+            min_dry_period (Timedelta): Minimum duration that counts as a dry period.
+
+        Returns:
+            pd.DataFrame: events with start and end times
+        """
+        # NaNs are assumed to be wet weather
+        criterion_bool = self.get_criterion_series().fillna(self.dw_crit_limit+1) < self.dw_crit_limit
+
+        dry_weather_table = span_table(span_bool=criterion_bool)
+
+        # it is only a dw event (period) when it is longer than "min_dry_period" dry.
+        dry_weather_table = dry_weather_table[event_duration(dry_weather_table) >= (min_dry_period or self.min_dry_period)]
+
+        return dry_weather_table
+
     @timeit
-    def get_dw_bool_series(self, min_rain_period=None, extra_range=None, fill_na=np.nan, no_cache=False):
+    def get_dw_bool_series_v1(self, min_rain_period=None, extra_range=None, fill_na=np.nan):
         """
         Mark wet weather periods (including a tail = extra_range) with False and dry weather periods as True.
 
         NaN are equal to NaN in Timeseries.
 
         Short events will not have trail-periods and will be ignored.
-
-        TODO: enthält falsche Zeiträume
 
         Args:
             min_rain_period (pandas.Timedelta): minimum period to count as a rain-event_analysis. default: 2h
@@ -661,92 +764,40 @@ class AnalyseData:
         Returns:
             pd.Series[bool]: condition of DW-period
         """
-        if no_cache or self._dw_bool_series is None:
-
-            if extra_range is None:
-                extra_range = self.min_dry_period
-
-            # ---
-            events_ww = self.get_wet_weather_events(min_rain_period=min_rain_period,
-                                                    trail_period=extra_range).copy()
-
-            # extend rain events
-            events_ww['end'] += extra_range
-
-            index = self.ts.index
-            last_timestamp = index[-1]
-
-            # so the extended end is not longer than the series
-            events_ww['end'] = events_ww['end'].clip(upper=last_timestamp)
-
-            # ---
-            events_dw = self.get_dry_weather_events(min_dry_period=extra_range).copy()
-
-            # make dry period bool series
-            # dry_weather_bool = ~mark_event_bool(events_ww, index)
-            wet_weather_bool = mark_event_bool(events_ww, index)
-            dry_weather_bool = mark_event_bool(events_dw, index)
-
-            dry_weather_bool &= ~wet_weather_bool
-
-            # control
-            # potential_error = events_ww.index.size * Timedelta(self.ts.index.freq)
-            # ww_dur = (events_ww['end'] - events_ww['start']).sum() + potential_error
-            # ww_dur2 = (dry_weather_bool.size - dry_weather_bool.sum()) * Timedelta(self.ts.index.freq)
-
-            # setting boolean values to NaN will make the series to a type('0') and will convert the boolean to float!
-            dry_weather_bool[self.ts.isna()] = fill_na
-            if no_cache:
-                return dry_weather_bool
-            else:
-                self._dw_bool_series = dry_weather_bool.rename(L.DW_BOOL)
-
-        return self._dw_bool_series.fillna(fill_na)
-
-    def get_dw_bool_series_adv(self, fillna=np.nan):
-        smooth_window = self.dry_level_window
-        smooth = self.get_window_size(smooth_window)
-        _rolling_kwargs = dict(window=smooth, center=True, min_periods=int(smooth / 4))
-
-        criterion = self.get_criterion_series(smooth=1)
+        if extra_range is None:
+            extra_range = self.min_dry_period
 
         # ---
-        dw_bool_simple = criterion.abs() < self.dw_crit_limit
+        events_ww = self.get_wet_weather_events(min_rain_period=min_rain_period,
+                                                trail_period=extra_range).copy()
+
+        # extend rain events
+        events_ww['end'] += extra_range
+
+        index = self.ts.index
+        last_timestamp = index[-1]
+
+        # so the extended end is not longer than the series
+        events_ww['end'] = events_ww['end'].clip(upper=last_timestamp)
 
         # ---
-        rolling_mean = criterion.where(dw_bool_simple).rolling(**_rolling_kwargs).median()
+        events_dw = self.get_dry_weather_events(min_dry_period=extra_range).copy()
 
-        rolling_diff = criterion - rolling_mean
-        rolling_std = rolling_diff.where(dw_bool_simple).abs().rolling(**_rolling_kwargs).median() * STD_TO_MAD
+        # make dry period bool series
+        # dry_weather_bool = ~mark_event_bool(events_ww, index)
+        wet_weather_bool = mark_event_bool(events_ww, index)
+        dry_weather_bool = mark_event_bool(events_dw, index)
 
-        # ---
-        dw_bool_simple_adv = rolling_diff.abs() <= (2 * rolling_std)
+        dry_weather_bool &= ~wet_weather_bool
 
-        # ---
-        rolling_mean2 = criterion.where(dw_bool_simple_adv).rolling(**_rolling_kwargs).median()
+        # control
+        # potential_error = events_ww.index.size * Timedelta(self.ts.index.freq)
+        # ww_dur = (events_ww['end'] - events_ww['start']).sum() + potential_error
+        # ww_dur2 = (dry_weather_bool.size - dry_weather_bool.sum()) * Timedelta(self.ts.index.freq)
 
-        rolling_diff2 = criterion - rolling_mean2
-        rolling_std2 = rolling_diff2.where(dw_bool_simple_adv).abs().rolling(**_rolling_kwargs).median() * STD_TO_MAD
+        # setting boolean values to NaN will make the series to a type('0') and will convert the boolean to float!
+        return dry_weather_bool.mask(self.ts.isna(), fill_na).rename(L.DW_BOOL)
 
-        # ---
-        # self._interim_dw_bool_adv = pd.DataFrame({
-        #     '_rolling_mean': rolling_mean,
-        #     '_rolling_diff': rolling_diff,
-        #     '_rolling_std': rolling_std,
-        #     '_rolling_mean2': rolling_mean2,
-        #     '_rolling_diff2': rolling_diff2,
-        #     '_rolling_std2': rolling_std2,
-        # })
-
-        # ---
-        dw_bool_series = rolling_diff2 <= (2 * rolling_std2)
-
-        # Split your data into two parts: one with missing values and one without
-        dw_bool_series = dw_bool_series.reindex(self.ts.index).rename(L.DW_BOOL)
-        dw_bool_series[self.ts.isnull()] = fillna
-        self._dw_bool_series = dw_bool_series
-
-        return self._dw_bool_series
 
     # ------------------------------------------------------------------------------------------------------------------
     def set_dw_bool_series(self, bool_series):
@@ -835,7 +886,7 @@ class AnalyseData:
             criterion[~dw_bool] = np.nan
 
             self.criterion_level = self._smooth_criterion(criterion, smooth).rename(L.DW_LEVEL)
-        return self.criterion_level.rolling(smooth, center=True, min_periods=1).mean()
+        return self.criterion_level
 
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
@@ -866,13 +917,14 @@ class AnalyseData:
             self._dw_continuum_series = cont.rename(L.DW_CONTINUUM)
         return self._dw_continuum_series
 
-    def get_dw_continuum_series_event(self, start, end):
+    def get_dw_continuum_series_event(self, start, end, smooth_window=None):
         """
         Get a dry-weather-continuum time-series based on the criterion-level if a specific time range would be unavailable.
 
         Args:
             start (pd.Timestamp): start time of synthetical unavailable time range
             end (pd.Timestamp): end time of synthetical unavailable time range
+            smooth_window (pd.Timedelta | int): window for smoothing dw-level
 
         Returns:
             pd.Series: dry-weather-continuum time-series.
@@ -880,15 +932,19 @@ class AnalyseData:
         # DW-continuum for evaluation of the algorithm
         # resulted series is only from `start` to `end`
 
-        regular = self.get_dw_mean_series(smooth=1).loc[start:end]
-        criterion = self.get_criterion_series(smooth=1)
+        regular = self.get_dw_mean_series().loc[start:end]
+        var = self.get_dw_variance_series().loc[start:end]
+
+        criterion = self.get_criterion_series(smooth=1).copy()
         # level = self.get_criterion_level_series()  # .round(1)
-        var = self.get_dw_variance_series(smooth=1).loc[start:end]
+        dw_bool = self.get_dw_bool_series(fill_na=False)
+        criterion[~dw_bool] = np.nan
 
         # cut out of given timerange - so it has no influence to the result
         criterion[start:end] = np.nan
 
-        level = self._smooth_criterion(criterion, smooth=self.get_window_size(self.dry_level_window)).loc[start:end]
+        smooth = self.get_window_size(smooth_window or self.dry_level_window)
+        level = self._smooth_criterion(criterion, smooth=smooth).loc[start:end]
 
         lower = level < 0
         higher = level > 0
@@ -950,10 +1006,10 @@ class AnalyseData:
 
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
-    def get_dw_avail(self, window=pd.Timedelta(days=2), crit_limit=100):
+    def get_dw_avail(self, window=pd.Timedelta(days=2)):
         """Availability of criterion in DW-period for the calculation of the DW-Level"""
         if self._dw_avail_series is None:
-            dw_bool = self.get_dw_bool_series(crit_limit=crit_limit, fill_na=False)
+            dw_bool = self.get_dw_bool_series(fill_na=False)
             window_num = self.get_window_size(window)  # int(round(window / guess_freq(dw_bool.index)))
             roll = dw_bool.rolling(window_num, center=True, min_periods=int(window_num / 4))
             dry_weather_avail = roll.sum() / roll.count() * 100
@@ -985,7 +1041,7 @@ class AnalyseData:
 
     @timeit
     @smoother
-    def get_dw_uncertainty_table(self, min_rain_period=None, extra_range=None):
+    def get_dw_uncertainty_table(self):
         """
         Aggregate data für analysis groups and calculate the dry-weather uncertainty.
 
@@ -1002,7 +1058,7 @@ class AnalyseData:
         if isfile(fn):
             return self._read(fn)
         else:
-            dw_bool = self.get_dw_bool_series(min_rain_period=min_rain_period, extra_range=extra_range, fill_na=False)
+            dw_bool = self.get_dw_bool_series(fill_na=False)
             diff = self.get_dw_residual_series(dw_bool)
             grouper = diff.groupby([self.day_category_index[dw_bool], self.ts.index.time[dw_bool]])
             dw_uncertainty = grouper.std().unstack(0)
