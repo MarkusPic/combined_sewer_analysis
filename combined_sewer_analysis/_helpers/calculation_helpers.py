@@ -186,7 +186,7 @@ def _calc_dry_variation(_variation, kind):
 
 
 def calc_dry_variation(s, kind):
-    return _calc_dry_variation(s.values, kind)
+    return _calc_dry_variation(s, kind)
 
 
 def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False):

@@ -130,10 +130,10 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
         plt.close()
 
     # ===
-    compare_timestamp_distribution(data_class, pth)
+    # compare_timestamp_distribution(data_class, pth)
 
     # ===
-    #get_available_data_ratio(data_class, pth, level_of_detail=10)
+    # get_available_data_ratio(data_class, pth, level_of_detail=10)
 
     # ===
-    # stability_analysis(data_class)
+    stability_analysis(data_class)

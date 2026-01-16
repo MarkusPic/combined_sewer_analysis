@@ -26,7 +26,7 @@ LANG = ENG
 
 ########################################################################################################################
 def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
-                    major_freq='h', minor_freq='15min', rasterized=True, alpha=0.05) -> tuple[plt.Figure, plt.Axes]:
+                    major_freq='h', minor_freq='15min', rasterized=True, alpha=0.05, ax=None) -> tuple[plt.Figure, plt.Axes]:
     # Statistical Tests for Normality
     # from scipy.stats import *
     # https://towardsdatascience.com/normality-tests-in-python-31e04aa4f411
@@ -44,14 +44,14 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
-        ax = data_table_dry.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
+        ax = data_table_dry.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized, ax=ax)
 
         wet = s[s.index.difference(dry.index)]
         data_table_wet = compare_daily_times_table(wet)
         ax = data_table_wet.T.plot(alpha=alpha, legend=False, color='cyan', ax=ax, rasterized=rasterized)
     else:
         data_table = compare_daily_times_table(s)
-        ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
+        ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized, ax=ax)
 
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
 
@@ -74,7 +74,7 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
 
     m = ax.plot(data.get_dw_mean_table(smooth=smooth)[day], color=daykind_color(s.name))
 
-    bounds = data.get_dw_bound_table(smooth=smooth)
+    bounds = data.get_dw_bound_table_v2(smooth=smooth)
 
     upper, lower = bounds[L.UPPER], bounds[L.LOWER]
 
@@ -84,7 +84,7 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
                     alpha=.2, color=daykind_color(s.name))
 
     # add_custom_legend(ax, {'DW Bandwidth': bw})
-    ax.legend(m + [bw], ['DW Mean', 'DW Bandwidth'])
+    ax.legend(m + [bw], ['DW mean', 'DW bandwidth'])
 
     # ax.get_figure().show()
     # ax.legend().remove()
@@ -202,10 +202,10 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
     return fig
 
 
-def diurnal_density_full(ts: pd.Series, major_freq='1h', minor_freq='15min', alpha=0.05, rasterized=True) -> tuple[plt.Figure, plt.Axes]:
+def diurnal_density_full(ts: pd.Series, major_freq='1h', minor_freq='15min', alpha=0.05, major_fmt='%-H', rasterized=True) -> tuple[plt.Figure, plt.Axes]:
     data_table = compare_daily_times_table(ts)
     ax = data_table.T.plot(alpha=alpha, legend=False, color='black', rasterized=rasterized)
-    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq, major_fmt=major_fmt)
     return ax.get_figure(), ax
 
 
@@ -263,7 +263,10 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
         data7_mean2.index = pd.to_timedelta([i.hour for i in data7_mean2.index], unit='h') + \
                             pd.to_timedelta([i.minute for i in data7_mean2.index], unit='m')
 
-        data7_mean2 = data7_mean2[li_weekdays]
+        if data._number_day_labels:
+            data7_mean2 = data7_mean2[[f'{i} {d}' for i, d in enumerate(li_weekdays, start=1)]]
+        else:
+            data7_mean2 = data7_mean2[li_weekdays]
 
         data7_mean2.columns = pd.timedelta_range(start=pd.Timedelta(0), end=pd.Timedelta(days=6), freq='d')
 
@@ -279,7 +282,7 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
     return ax.get_figure(), ax
 
 
-def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap='Greys', smooth=None, xbins=500, ybins=100, ymax=100, add_colorbar=False) -> tuple[plt.Figure, plt.Axes]:
+def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap='Greys', smooth=None, xbins=500, ybins=100, ymax=100, add_colorbar=False, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     li_weekdays = list(calendar.day_name)
     ts_normal_week = data.ts[np.isin(data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
     ts_normal_week = ts_normal_week[ts_normal_week < ymax]
@@ -298,7 +301,7 @@ def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap=
                      # ticks=[0,1,2,3,4,5]
                      )
 
-    ax.set_title('Weekly')
+    # ax.set_title('Weekly')
 
     if add_mean:
         data7_mean = data.get_dw_mean_table(smooth=None).copy()
@@ -316,9 +319,9 @@ def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap=
         meas.index = meas.index.total_seconds()*1e9
         if smooth is not None:
             meas = meas.rolling(smooth).mean()
-        ax = meas.rename('Mittelwert').plot(ax=ax, color='red', lw=2, legend=True)
+        ax = meas.rename('DW mean').plot(ax=ax, color='red', lw=2, legend=True)
 
-    ax = weekly_x_axes(ax, sunday_first=False)  # , custom_switch_time='00:00', start = data7_mean.index[0], data7_mean.index[-1])
+    ax = weekly_x_axes(ax, sunday_first=False, **kwargs)  # , custom_switch_time='00:00', start = data7_mean.index[0], data7_mean.index[-1])
 
     return ax.get_figure(), ax
 
@@ -329,6 +332,10 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
     """every day is thrown into one pit. -> not good"""
     if arithmetic is None:
         arithmetic = data.arithmetic
+
+    cmap = plt.get_cmap('cividis')
+    norm = mcolors.Normalize(vmin=1, vmax=3)
+    color = cmap(norm(1))
 
     # ---
     res = {}
@@ -378,31 +385,34 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
     lower_ranges = lower_ranges.rolling(4, min_periods=1, center=True).median().rolling(5, min_periods=1,
                                                                                         center=True).mean()
 
-    ax: plt.Axes = upper_ranges.plot(color=['r', 'g', 'y'], legend=True)
-    ax.legend(title='Described calculation steps')
-    lower_ranges.plot(color=['y', 'g', 'r'], legend=False, ax=ax)
+    ax: plt.Axes = upper_ranges.plot(color=[cmap(norm(i)) for i in range(3, 0, -1)], legend=True)
+    ax.legend(title='Uncertainty')
+    lower_ranges.plot(color=[cmap(norm(i)) for i in range(1, 4)], legend=False, ax=ax)
 
-    title = f'DW-Mean Stability Analysis\n[{arithmetic=}]'
+    # ---
+    title = f'DW mean stability analysis\n[{arithmetic=}]'
 
     if var:
         title = title.replace('Mean', 'Variation')
 
-    ax.set_xlim(left=0)
-    ax.set_ylabel('Divergence to Final Result')
-    ax.set_xlabel('Number of considered Data')
     ax.set_title(title, fontsize=12, fontweight='bold')
 
-    ax.axhline(0, lw=0.4, color='black', zorder=0)
+    # ---
+    ax.set_xlim(left=0)
+    ax.set_ylabel('Deviation to result for full dataset')
+    ax.set_xlabel('Sample size')
+
+    ax.axhline(0, lw=0.7, color='black', zorder=0)
 
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
 
-    ax.get_figure().show()
+    # ax.get_figure().show()
 
     return ax.get_figure(), ax
 
 
 ########################################################################################################################
-def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='h', minor_freq='15min') -> tuple[plt.Figure, plt.Axes]:
+def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='h', minor_freq='15min', major_fmt='%-H') -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -427,19 +437,19 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     ax = None
     for day in mean.columns:
         print(day)
-        ax = mean[day].plot(ax=ax, color=daykind_color(day), legend=True)
+        ax = mean[day].plot(ax=ax, color=daykind_color(day, data.day_kind_detail), legend=True)
         if add_bounds:
             ax.fill_between(mean.index,
                             agg_dry_bound[(L.LOWER, day)],
                             agg_dry_bound[(L.UPPER, day)],
-                            alpha=.25, color=daykind_color(day), lw=2)
+                            alpha=.25, color=daykind_color(day), lw=0)
 
     ylim = get_ylim(data.ts)
 
     title = make_title(title, default=get_compare_diurnal_title(name=data.name))
     # title = get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit, smooth=smooth)
 
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title, major_freq=major_freq, minor_freq=minor_freq)
+    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title, major_freq=major_freq, minor_freq=minor_freq, major_fmt=major_fmt)
     ax.set_ylim(ylim)
     return ax.get_figure(), ax
 
@@ -606,7 +616,7 @@ def compare_dw_uncertainty_day_relative(data: AnalyseData, smooth=20,
     return ax.get_figure(), ax
 
 
-def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_width=5):
+def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_width=5, set_title=True):
     import seaborn as sns
     from mp.libs import fitter
     import math
@@ -628,7 +638,7 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
     # f.fit()
     # ax.plot(f.x, f.fitted_pdf['lognorm'], lw=1, label='lognorm', color='black')
 
-    series_ww = series[~dw_bool].copy()
+    series_ww = series.loc[~dw_bool].copy()
 
     if not series_ww.empty:
         bins = np.arange(math.floor(series_ww.min() / bin_width) * bin_width,
@@ -682,13 +692,24 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
 
     # ---
     ax_dry.set_ylim(top=upper_lim)
-    ax_dry.set_title(f'DRY\nn={series_dw.size}\n[{min_dw:0.0f} ... {max_dw:0.0f}]')
+    if set_title:
+        ax_dry.set_title(f'Dry\nn={series_dw.size}\n[{min_dw:0.0f} ... {max_dw:0.0f}]')
 
-    ax_wet.set_title(f'WET\nn={series_ww.size}\n[{min_ww:0.0f} ... {max_ww:0.0f}]')
+        ax_wet.set_title(f'Wet\nn={series_ww.size}\n[{min_ww:0.0f} ... {max_ww:0.0f}]')
 
-    fig.suptitle(f'{day_kind} | {timestamp}\n'
-                 f'mean$_{{dw}}$={mean_dw:0.1f} | std$_{{dw}}$={std_dw:0.1f}\n'
-                 f'median$_{{all}}$={median_all:0.1f} | std$_{{robust,all}}$={std_robust_all:0.1f}')
+        fig.suptitle(f'{day_kind} | {timestamp}\n'
+                     f'$\\bar{{x}}_{{dw}}$={mean_dw:0.1f} | $\\sigma_{{dw}}$={std_dw:0.1f}\n'
+                     f'median$\\hat{{x}}_{{all}}$={median_all:0.1f} | $\\sigma_{{robust,all}}$={std_robust_all:0.1f}')
+    else:
+        ax_dry.set_title('Dry weather')
+        ax_wet.set_title('Wet weather')
+        print(f'Dry\nn={series_dw.size}\n[{min_dw:0.0f} ... {max_dw:0.0f}]')
+
+        print(f'Wet\nn={series_ww.size}\n[{min_ww:0.0f} ... {max_ww:0.0f}]')
+
+        print(f'{day_kind} | {timestamp}\n'
+                     f'$\\bar{{x}}_{{dw}}$={mean_dw:0.1f} | $\\sigma_{{dw}}$={std_dw:0.1f}\n'
+                     f'median$\\hat{{x}}_{{all}}$={median_all:0.1f} | $\\sigma_{{robust,all}}$={std_robust_all:0.1f}')
 
     # fig.show()
     return fig

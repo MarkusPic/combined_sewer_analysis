@@ -7,6 +7,7 @@ par_last = u'\u2502' + '  '  # '│   '
 
 
 try:
+    raise ModuleNotFoundError
     from mp.helpers import class_timeit as timeit, check
     from mp.helpers.check_time import lev
 except ModuleNotFoundError:

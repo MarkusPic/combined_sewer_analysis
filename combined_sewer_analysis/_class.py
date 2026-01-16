@@ -277,7 +277,7 @@ class AnalyseData:
     def get_diff_day_type(self, index, level_of_detail=None, add_number=None):
         return diff_day_type(index,
                              level_of_detail=level_of_detail or self.day_kind_detail,
-                             add_number=add_number or self._number_day_labels)
+                             add_number=add_number if add_number is not None else self._number_day_labels)
 
     @property
     def day_category_index(self) -> pd.CategoricalIndex:
@@ -431,6 +431,18 @@ class AnalyseData:
 
         return bound
 
+    @smoother
+    def get_dw_bound_table_v2(self):
+        dw_bool = self.get_dw_bool_series(fill_na=False)
+        def _bounds(s):
+            v = s[dw_bool[s.index]]
+            return {L.UPPER: v.quantile(0.975), L.LOWER: v.quantile(0.025)}
+
+        bound = self.get_analysis_grouper().apply(_bounds)  # multiindex: day - time - (lower/upper)
+        bound = bound.unstack([2, 0])
+        return bound
+
+
     # TRANSFORMATIONS---------------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------------------------------
     def _lookup(self, data):
@@ -520,7 +532,7 @@ class AnalyseData:
             diff = self.ts - self.get_dw_mean_series(arithmetic, smooth=None)
             var = self.get_dw_variance_series(arithmetic, smooth=None)
 
-            #
+
             lower = diff < -accuracy
             higher = diff > accuracy
 
@@ -534,7 +546,7 @@ class AnalyseData:
             return criterion
 
     @smoother
-    def get_criterion_series(self, arithmetic=None, limit=None) -> pd.Series:
+    def get_criterion_series(self, arithmetic=None, limit=None, start=None, end=None) -> pd.Series:
         """float between 0 (=DW-Mean) and inf where 100 is estimated the maximum DW. NaN if NaN in timeseries!"""
         if arithmetic is not None:
             # calculate custom crit
@@ -542,9 +554,9 @@ class AnalyseData:
 
         if self.criterion is None:
             self.criterion = self._calc_criterion()
-        return self.criterion.divide(limit or self.limit)
+        return self.criterion[slice(start, end)].divide(limit or self.limit)
 
-    def get_dw_bool_series(self, fill_na=np.nan, no_cache=False):
+    def get_dw_bool_series(self, fill_na=np.nan, no_cache=False, start=None, end=None):
         if no_cache or self._dw_bool_series is None:
             smooth_window = self.dry_level_window
             smooth = self.get_window_size(smooth_window)
@@ -592,7 +604,7 @@ class AnalyseData:
             else:
                 self._dw_bool_series = dw_bool_series.rename(L.DW_BOOL)
 
-        return self._dw_bool_series.mask(self.ts.isnull(), fill_na)
+        return self._dw_bool_series[slice(start, end)].mask(self.ts.isnull(), fill_na)
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_wet_weather_events(self, min_rain_period=None, trail_period=None, no_cache=False):
@@ -935,15 +947,18 @@ class AnalyseData:
         regular = self.get_dw_mean_series().loc[start:end]
         var = self.get_dw_variance_series().loc[start:end]
 
-        criterion = self.get_criterion_series(smooth=1).copy()
+        smooth = self.get_window_size(smooth_window or self.dry_level_window)
+        start_ext = start - smooth * self.guessed_freq
+        end_ext = end + smooth * self.guessed_freq
+
+        criterion = self.get_criterion_series(smooth=1, start=start_ext, end=end_ext).copy()
         # level = self.get_criterion_level_series()  # .round(1)
-        dw_bool = self.get_dw_bool_series(fill_na=False)
+        dw_bool = self.get_dw_bool_series(fill_na=False, start=start_ext, end=end_ext)
         criterion[~dw_bool] = np.nan
 
         # cut out of given timerange - so it has no influence to the result
         criterion[start:end] = np.nan
 
-        smooth = self.get_window_size(smooth_window or self.dry_level_window)
         level = self._smooth_criterion(criterion, smooth=smooth).loc[start:end]
 
         lower = level < 0
@@ -983,15 +998,17 @@ class AnalyseData:
         if which not in self.cont:
             self.cont[which] = self.ts.values
 
-            criterion = self.get_criterion_series(smooth=1)
+            if _ := 0:
+                factor = {L.MEAN: 0,
+                          L.UPPER: 100,
+                          L.LOWER: -100,
+                          L.AUTO: self.get_criterion_level_series()
+                          }[which]
 
-            factor = {L.MEAN: 0,
-                      L.UPPER: 100,
-                      L.LOWER: -100,
-                      L.AUTO: self.get_criterion_level_series()
-                      }[which]
-
-            out = criterion.sub(factor).abs() > self.ww_crit_limit
+                criterion = self.get_criterion_series(smooth=1)
+                out = criterion.sub(factor).abs() > self.ww_crit_limit
+            else:
+                out = ~self.get_dw_bool_series(fill_na=False).astype(bool)
 
             fill_series = {L.MEAN: self.get_dw_mean_series(smooth=1),
                            L.UPPER: self.get_dw_range_series(smooth=1)[L.UPPER],
@@ -1094,6 +1111,18 @@ class AnalyseData:
             f'{L.DW_UNCERTAINTY}-{L.UPPER}': dw_cont + dw_uc * 2,
             f'{L.DW_UNCERTAINTY}-{L.LOWER}': dw_cont - dw_uc * 2,
         })
+
+    def get_interim_frame(self):
+        df = pd.concat([
+            self.ts.rename('Obs.'),
+            self.day_category_index,
+            self.get_dw_mean_series(),
+            self.get_dw_bool_series(),
+            self.get_criterion_series(),
+            self.get_dw_continuum_series(),
+            self.get_dw_residual_series().rename('DW-RESIDUALS')
+        ], axis=1)
+        return df
 
     ####################################################################################################################
     def _write(self, data, fn):
