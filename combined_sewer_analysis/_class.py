@@ -274,10 +274,11 @@ class AnalyseData:
 
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
-    def get_diff_day_type(self, index, level_of_detail=None, add_number=None):
+    def get_diff_day_type(self, index, level_of_detail=None, add_number=None, as_series=False):
         return diff_day_type(index,
                              level_of_detail=level_of_detail or self.day_kind_detail,
-                             add_number=add_number if add_number is not None else self._number_day_labels)
+                             add_number=add_number if add_number is not None else self._number_day_labels,
+                             as_series=as_series)
 
     @property
     def day_category_index(self) -> pd.CategoricalIndex:
@@ -313,7 +314,7 @@ class AnalyseData:
             if isfile(fn):
                 self._grouper_analysis = self._read(fn)
             else:
-                self._grouper_analysis = self.ts.groupby([self.day_category_index, self.ts.index.time])
+                self._grouper_analysis = self.ts.groupby([self.day_category_index, self.ts.index.time], observed=False)
                 self._write(self._grouper_analysis, fn)
         return self._grouper_analysis
 
@@ -545,7 +546,6 @@ class AnalyseData:
             self._write(criterion, fn)
             return criterion
 
-    @smoother
     def get_criterion_series(self, arithmetic=None, limit=None, start=None, end=None) -> pd.Series:
         """float between 0 (=DW-Mean) and inf where 100 is estimated the maximum DW. NaN if NaN in timeseries!"""
         if arithmetic is not None:
@@ -562,7 +562,7 @@ class AnalyseData:
             smooth = self.get_window_size(smooth_window)
             _rolling_kwargs = dict(window=smooth, center=True, min_periods=int(smooth / 4))
 
-            criterion = self.get_criterion_series(smooth=1)
+            criterion = self.get_criterion_series()
 
             # ---
             dw_bool_simple = criterion.abs() < self.dw_crit_limit
@@ -593,7 +593,7 @@ class AnalyseData:
             # })
 
             # ---
-            dw_bool_series = rolling_diff2 <= (2.5 * rolling_std2)
+            dw_bool_series = rolling_diff2.abs() <= (2.5 * rolling_std2)
 
             # Split your data into two parts: one with missing values and one without
             dw_bool_series = dw_bool_series.reindex(self.ts.index).rename(L.DW_BOOL)
@@ -662,7 +662,7 @@ class AnalyseData:
             pd.DataFrame: events with start and end times
         """
         # NaNs are assumed to be dry weather
-        criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit
+        criterion_bool = self.get_criterion_series().fillna(0) > self.ww_crit_limit  # smooth?
 
         wet_weather_table = span_table(span_bool=criterion_bool)
         # it is only a wet-weather-event when it is longer than "min_rain_period"
@@ -750,7 +750,7 @@ class AnalyseData:
             pd.DataFrame: events with start and end times
         """
         # NaNs are assumed to be wet weather
-        criterion_bool = self.get_criterion_series().fillna(self.dw_crit_limit+1) < self.dw_crit_limit
+        criterion_bool = self.get_criterion_series().fillna(self.dw_crit_limit+1) < self.dw_crit_limit  # smooth?
 
         dry_weather_table = span_table(span_bool=criterion_bool)
 
@@ -893,7 +893,7 @@ class AnalyseData:
         """
         smooth = self.get_window_size(smooth_window or self.dry_level_window)
         if self.criterion_level is None:
-            criterion = self.get_criterion_series(smooth=1)
+            criterion = self.get_criterion_series()
             dw_bool = self.get_dw_bool_series(fill_na=False)
             criterion[~dw_bool] = np.nan
 
@@ -913,10 +913,10 @@ class AnalyseData:
             pd.Series: dry-weather continuum.
         """
         if self._dw_continuum_series is None:
-            regular = self.get_dw_mean_series(smooth=1)
+            regular = self.get_dw_mean_series()
             # criterion = self.get_criterion(smooth=1)  # .round(1)
             level = self.get_criterion_level_series()  # .round(1)
-            var = self.get_dw_variance_series(smooth=1)
+            var = self.get_dw_variance_series()
 
             lower = level < 0
             higher = level > 0
@@ -951,7 +951,7 @@ class AnalyseData:
         start_ext = start - smooth * self.guessed_freq
         end_ext = end + smooth * self.guessed_freq
 
-        criterion = self.get_criterion_series(smooth=1, start=start_ext, end=end_ext).copy()
+        criterion = self.get_criterion_series(start=start_ext, end=end_ext).copy()
         # level = self.get_criterion_level_series()  # .round(1)
         dw_bool = self.get_dw_bool_series(fill_na=False, start=start_ext, end=end_ext)
         criterion[~dw_bool] = np.nan
@@ -1005,7 +1005,7 @@ class AnalyseData:
                           L.AUTO: self.get_criterion_level_series()
                           }[which]
 
-                criterion = self.get_criterion_series(smooth=1)
+                criterion = self.get_criterion_series()
                 out = criterion.sub(factor).abs() > self.ww_crit_limit
             else:
                 out = ~self.get_dw_bool_series(fill_na=False).astype(bool)
@@ -1112,17 +1112,40 @@ class AnalyseData:
             f'{L.DW_UNCERTAINTY}-{L.LOWER}': dw_cont - dw_uc * 2,
         })
 
-    def get_interim_frame(self):
+    def get_interim_frame(self, date_slice=None):
         df = pd.concat([
             self.ts.rename('Obs.'),
-            self.day_category_index,
+            self.get_diff_day_type(self.ts.index, as_series=True).rename('Day-Category'),
             self.get_dw_mean_series(),
             self.get_dw_bool_series(),
             self.get_criterion_series(),
+            self.get_criterion_level_series(),
             self.get_dw_continuum_series(),
-            self.get_dw_residual_series().rename('DW-RESIDUALS')
+            self.get_dw_residual_series(self.get_dw_bool_series(fill_na=False)).rename('DW-RESIDUALS')
         ], axis=1)
+        if date_slice is not None:
+            df = df.loc[date_slice]
         return df
+
+    def get_interim_figure(self, date_slice=None):
+        import matplotlib.pyplot as plt
+        df = self.get_interim_frame()
+        if date_slice is not None:
+            df = df.loc[date_slice]
+        fig, axes = plt.subplots(nrows=3, sharex=True)
+        df[['Obs.', L.DW_CONTINUUM, L.DW_MEAN]].plot(ax=axes[0])
+        df[[L.DW_CRITERION, L.DW_LEVEL]].plot(ax=axes[1])
+        # axes[1].set_yscale('log')
+        axes[1].set_ylim(-200, 200)
+        df[['DW-RESIDUALS', ]].plot(ax=axes[2])
+
+        from sww.libs.timeseries.plots.event_plots import add_event_marker
+        dw_bool = df[L.DW_BOOL].mask(self.ts.isnull(), False)
+        dw_table = span_table(span_bool=dw_bool)
+        for ax in axes:
+            add_event_marker(ax, dw_table, label='DW')
+
+        return fig, axes
 
     ####################################################################################################################
     def _write(self, data, fn):

@@ -9,10 +9,12 @@ from scipy.stats import norm
 
 from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
+from sww.libs.timeseries.plots.event_plots import add_event_marker
 from sww.libs.timeseries.plots.legend_helpers import add_custom_legend, get_legend_dict
 
 # from sww.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
 from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
+from sww.libs.timeseries.stats.events import filter_events
 from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
 
 from ._helpers.debug_helpers import check
@@ -489,27 +491,38 @@ def dry_percentage(data: AnalyseData, unit=None, title=None, lang=LANG):
 
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
-              title=None, lang=LANG, mark_holidays=False):
-    level = data.get_criterion_level_series(smooth_window=smooth_window).resample('D').mean()
-    ax = level.plot(color=color)
+              title=None, lang=LANG, mark_holidays_school=False, mark_holidays_business=False):
+    _g = data.get_criterion_level_series(smooth_window=smooth_window).resample('7d')
+    level = _g.mean()
+    level = level[_g.count() > 0]
+    ax = level.rename('DW level').plot(color=color)
     ax.set_xlim(level.index[0], level.index[-1])
 
-    if mark_holidays:
-        school_holidays = get_school_holidays()
+    if mark_holidays_school:
+        school_free = get_school_holidays().rename(columns={'Beginn': 'start', 'Ende': 'end'})
+        school_free['start'] = school_free['start'].dt.tz_localize(level.index.tz)
+        school_free['end'] = school_free['end'].dt.tz_localize(level.index.tz)
+        school_free = filter_events(school_free, level.index[0], level.index[-1])
 
-        for name, times in school_holidays.iterrows():
-            ax.axvspan(times['Beginn'], times['Ende'], color='y', alpha=0.7)
+        school_holidays = school_free[school_free['Bemerkungen'] != 'Covid-19']
+        add_event_marker(ax, school_holidays, 'yellow', 0.7, label)
 
+        covid_free = school_free[school_free['Bemerkungen'] == 'Covid-19']
+        add_event_marker(ax, covid_free, 'lightgray', 0.7, 'Covid-19')
+
+    if mark_holidays_business:
         hd = get_holidays(list(range(level.index[0].year, level.index[-1].year)), state='ST')
-
+        _label = 'Business Holiday'
         for day, name in hd.items():
-            ax.axvspan(day, day + pd.Timedelta(days=1, seconds=-1), color='r', alpha=0.6)
+            ax.axvspan(day, day + pd.Timedelta(days=1, seconds=-1), color='red', alpha=0.6, label=_label)
+            _label = None
 
     ax.axhline(0, color='black', linewidth=0.7)
     ax.axhline(100, color='darkgray', linewidth=0.7)
     ax.axhline(-100, color='darkgray', linewidth=0.7)
     ax.set_ylabel(label)
     ax.set_xlabel('')
+    ax.legend()
     ax.set_title(make_title(title, default=cst_label(data.name, unit=False)))
     ax = translate_ax(ax, lang=lang)
     return ax.get_figure()
