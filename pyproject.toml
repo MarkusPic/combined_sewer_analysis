@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "combined_sewer_analysis"
+description = ""
+version = "0.1"
+readme = "README.md"
+authors = [
+    { name = "Markus Pichler", email = "markus.pichler@student.tugraz.at" }
+]
+requires-python = ">=3.8"
+keywords = ["sewer", "environment", "civil_engineering", "time-series-analysis"]
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Natural Language :: English",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "pandas",  # and its requirement "numpy"
+    "tqdm",
+    "packaging",
+    "holidays",
+    "matplotlib",
+    "numpy",
+    "scipy",
+    "pyarrow"
+]

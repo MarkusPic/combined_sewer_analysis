@@ -2,9 +2,8 @@ from pathlib import Path
 
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from tqdm import tqdm
 
-from . import AnalyseData
+from ._class import AnalyseData
 from .figures import _single_timestamp_distribution
 
 
@@ -22,6 +21,7 @@ def compare_timestamp_distribution(data: AnalyseData, pth: Path):
     bin_width = 5
 
     pdfs = {}
+    from tqdm import tqdm
     progress = tqdm(groupby)
 
     # ---

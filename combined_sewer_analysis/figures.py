@@ -7,12 +7,11 @@ from matplotlib.ticker import PercentFormatter, EngFormatter
 import matplotlib.colors as mcolors
 from scipy.stats import norm
 
-from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
+# from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
 from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
+
 from sww.libs.timeseries.plots.event_plots import add_event_marker
 from sww.libs.timeseries.plots.legend_helpers import add_custom_legend, get_legend_dict
-
-# from sww.libs.timeseries.plots.plot_style import get_legend_dict, add_custom_legend
 from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
 from sww.libs.timeseries.stats.events import filter_events
 from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
@@ -734,37 +733,3 @@ AnalyseData.figure_compare_day = compare_day
 AnalyseData.figure_dry_percentage = dry_percentage
 AnalyseData.figure_dry_trend = dry_trend
 AnalyseData.figure_stability_analysis = stability_analysis
-
-
-class AnalysePlots:
-    def __init__(self, data: AnalyseData):
-        self._data = data
-
-    def diurnal_density(self, day_series, ylim, smooth=20, show_rain=None, unit=None, title=None, lang=LANG):
-        return diurnal_density(self._data, day_series, ylim, smooth=smooth, show_rain=show_rain, unit=unit, title=title,
-                               lang=lang)
-
-    def compare_day(self, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG):
-        return compare_day(self._data, smooth=smooth, unit=unit, add_bounds=add_bounds, title=title,
-                           two_lines=two_lines,
-                           lang=lang)
-
-    def dry_percentage(self, unit=None, title=None, lang=LANG):
-        return dry_percentage(self._data, unit=unit, title=title, lang=lang)
-
-    def diurnal_density2(self, dry_data=None, smooth=20, criterion=None, unit=None, no_calc=False,
-                         down_scale='5T', add_bounds=True, title=None, ylim=None, two_label_lines=True, ylabel=None,
-                         lang=LANG):
-        daily_groups = self._data.get_day_grouper()
-        return [diurnal_density2(daily_groups.get_group(daily_group), self._data, dry_data=dry_data, smooth=smooth,
-                                 criterion=criterion, unit=unit,
-                                 no_calc=no_calc, down_scale=down_scale, add_bounds=add_bounds, title=title, ylim=ylim,
-                                 two_label_lines=two_label_lines, ylabel=ylabel, lang=lang)
-                for daily_group in daily_groups]
-
-    def dry_trend(self, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level', title=None,
-                  lang=LANG):
-        return dry_trend(self._data, smooth_window=smooth_window, color=color, label=label, title=title, lang=lang)
-
-    def stability_analysis(self, kind=1, var=False, lang=LANG):
-        return stability_analysis(self._data, arithmetic=kind, var=var, lang=lang)
