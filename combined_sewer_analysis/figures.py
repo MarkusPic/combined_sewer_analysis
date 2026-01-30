@@ -3,30 +3,26 @@ import calendar
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import PercentFormatter, EngFormatter
+from matplotlib.ticker import PercentFormatter
 import matplotlib.colors as mcolors
 from scipy.stats import norm
 
-# from mp.projects.cst_monitoring.data_analysis.plots._helpers import args_to_string, get_compare_diurnal_title, get_diurnal_title, make_title
-from mp.projects.cst_monitoring.misc.plot_helpers import daykind_color, get_ylim, cst_label, diurnal_xlabel, translate_ax, ENG
-
-from sww.libs.timeseries.plots.event_plots import add_event_marker
-from sww.libs.timeseries.plots.legend_helpers import add_custom_legend, get_legend_dict
-from sww.libs.timeseries.plots.axes_formatting import diurnal_axes, weekly_x_axes
-from sww.libs.timeseries.stats.events import filter_events
-from sww.libs.timeseries.stats.stats import compare_week_table, compare_daily_times_table
-
+from ._helpers.event_plots import add_event_marker, event_line_axes
+from ._helpers.legend_helpers import add_custom_legend, get_legend_dict
+from ._helpers.axes_formatting import diurnal_axes, weekly_x_axes
+from ._helpers.events import filter_events, span_table
+from ._helpers.pivot_tables import compare_week_table, compare_daily_times_table
 from ._helpers.debug_helpers import check
-from .date_analysis import get_school_holidays, get_holidays, HOLIDAY, FAKE_FRIDAY, BRIDGE_DAY, DAY_KIND
+from ._helpers.plot_helpers import daykind_color, XLABEL_DIURNAL
+
 from ._class import AnalyseData, L
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean, mad
+from .date_analysis import get_school_holidays, get_holidays, HOLIDAY, FAKE_FRIDAY, BRIDGE_DAY, DAY_KIND
 from .definitions import MAD_TO_STD
-
-LANG = ENG
 
 
 ########################################################################################################################
-def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None, lang=LANG,
+def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=None, smooth=20, show_rain=None, unit=None, title=None,
                     major_freq='h', minor_freq='15min', rasterized=True, alpha=0.05, ax=None) -> tuple[plt.Figure, plt.Axes]:
     # Statistical Tests for Normality
     # from scipy.stats import *
@@ -59,17 +55,17 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
     ax.set(ylim=ylim)
 
     if title:
-        title = make_title(title,
-                           default=get_diurnal_title(name=data.name,
-                                                     day=s.name,
-                                                     kind=data.arithmetic,
-                                                     limit=data.limit,
-                                                     smooth=smooth))
+        # title = make_title(title,
+        #                    default=get_diurnal_title(name=data.name,
+        #                                              day=s.name,
+        #                                              kind=data.arithmetic,
+        #                                              limit=data.limit,
+        #                                              smooth=smooth))
 
         ax.set_title(title, fontsize=12, fontweight='bold')
 
-    if ylab:
-        ax.set_ylabel(cst_label(data.name, unit=unit))
+    # if ylab:
+    #     ax.set_ylabel(cst_label(data.name, unit=unit))
 
     # ax = data.get_dw_mean_table(smooth=smooth)[day].plot(ax=ax, color=daykind_color(s.name))
 
@@ -95,7 +91,7 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
 ########################################################################################################################
 def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, smooth=20, criterion=None, unit=None, no_calc=False,
                      down_scale='5T', add_bounds=True, title=None, ylim=None, two_label_lines=True, ylabel=None,
-                     lang=LANG, split=True, middle_y=None, rasterized=True) -> plt.Figure:
+                     split=True, middle_y=None, rasterized=True) -> plt.Figure:
     day = day_series.name
     # if day != 'Saturday':
     #     return
@@ -142,11 +138,11 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
             ax2 = data_table.T.plot(alpha=0.05, legend=False, color='black', ax=ax2)
         alpha = 0.2
 
-    title = make_title(title, default=get_diurnal_title(name=data.name, day=s.name))
+    # title = make_title(title, default=get_diurnal_title(name=data.name, day=s.name))
 
-    ax = diurnal_axes(ax, title=title, xlabel=diurnal_xlabel(lang=lang))
+    ax = diurnal_axes(ax, title=title, xlabel=XLABEL_DIURNAL)
     if split:
-        ax2 = diurnal_axes(ax2, title=title, xlabel=diurnal_xlabel(lang=lang))
+        ax2 = diurnal_axes(ax2, title=title, xlabel=XLABEL_DIURNAL)
 
     if not no_calc:
         ax = data.get_dw_mean_table(smooth=smooth)[day].plot(ax=ax, color=daykind_color(s.name), lw=2)
@@ -278,8 +274,8 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
         ax = meas.rename('Mittelwert').plot(ax=ax, color='red', lw=2, legend=True)
 
     ax = weekly_x_axes(ax, sunday_first=False)  # , custom_switch_time='00:00', start = data7_mean.index[0], data7_mean.index[-1])
-    ylim = get_ylim(data.ts)
-    ax.set_ylim(ylim)
+    # ylim = get_ylim(data.ts)
+    # ax.set_ylim(ylim)
     return ax.get_figure(), ax
 
 
@@ -289,7 +285,9 @@ def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap=
     ts_normal_week = ts_normal_week[ts_normal_week < ymax]
     sec = ts_normal_week.index.weekday*24*60*60 + ts_normal_week.index.hour*60*60 + ts_normal_week.index.minute*60 + ts_normal_week.index.second
 
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
+
     _ = ax.hist2d(sec*1e9, ts_normal_week, norm=mcolors.LogNorm(), cmap=cmap,
                   range=[[xmin:=0, xmax:=1440*60*7*1e9], [ymin:=ts_normal_week.min(), ymax:=ts_normal_week.max()]],
                   bins=[xbins, ybins]
@@ -413,7 +411,7 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
 
 
 ########################################################################################################################
-def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, lang=LANG, major_freq='h', minor_freq='15min', major_fmt='%-H') -> tuple[plt.Figure, plt.Axes]:
+def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, major_freq='h', minor_freq='15min', major_fmt='%-H') -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -423,7 +421,6 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
         add_bounds:
         title (str): title of the plot
         two_lines: for ylabel name and abbr+unit in 1 oder 2 lines
-        lang:
 
     Returns:
         plt.Figure:
@@ -445,13 +442,14 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
                             agg_dry_bound[(L.UPPER, day)],
                             alpha=.25, color=daykind_color(day), lw=0)
 
-    ylim = get_ylim(data.ts)
+    # ylim = get_ylim(data.ts)
 
-    title = make_title(title, default=get_compare_diurnal_title(name=data.name))
+    # title = make_title(title, default=get_compare_diurnal_title(name=data.name))
     # title = get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit, smooth=smooth)
-
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit, two_lines=two_lines), title=title, major_freq=major_freq, minor_freq=minor_freq, major_fmt=major_fmt)
-    ax.set_ylim(ylim)
+    # ax.set_title(title)
+    ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq, major_fmt=major_fmt)
+    # ax.set_ylabel(cst_label(data.name, unit=unit, two_lines=two_lines))
+    # ax.set_ylim(ylim)
     return ax.get_figure(), ax
 
 
@@ -469,7 +467,7 @@ def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq=
 
 
 ########################################################################################################################
-def dry_percentage(data: AnalyseData, unit=None, title=None, lang=LANG):
+def dry_percentage(data: AnalyseData, unit=None, title=None):
     from scipy.stats import percentileofscore
 
     def calc_dry_perc(s):
@@ -481,16 +479,17 @@ def dry_percentage(data: AnalyseData, unit=None, title=None, lang=LANG):
     res = data.get_analysis_grouper().apply(calc_dry_perc).unstack().T
     ax = res.plot()
 
-    title = make_title(title, default=get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit))
-
-    ax = diurnal_axes(ax, ylab=cst_label(data.name, unit=unit), title=title)
+    # title = make_title(title, default=get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit))
+    # ax.set_title(title)
+    ax = diurnal_axes(ax)
+    # ax.set_ylabel(cst_label(data.name, unit=unit))
     ax.set_ylim(0, 100)
     return ax.get_figure()
 
 
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
-              title=None, lang=LANG, mark_holidays_school=False, mark_holidays_business=False):
+              title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False):
     _g = data.get_criterion_level_series(smooth_window=smooth_window).resample('7d')
     level = _g.mean()
     level = level[_g.count() > 0]
@@ -519,16 +518,27 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
     ax.axhline(0, color='black', linewidth=0.7)
     ax.axhline(100, color='darkgray', linewidth=0.7)
     ax.axhline(-100, color='darkgray', linewidth=0.7)
+
+    if mark_gaps:
+        y0, y1 = ax.get_ylim()
+        y_max = y1
+        dy = (y1 - y0) / 30
+        nan_event = span_table(data.ts.isna().resample('7d').mean() > 0.5)
+        event_line_axes(nan_event, ax, y1, dy, color='grey', label='Gaps')
+        ax.axhline(y1, color='black', linewidth=0.7)
+        # ax.text(ax.get_xlim()[0], y1+dy/2, 'Gaps  ', va='center_baseline', ha='right')
+        ax.set_ylim(y0, y_max + dy)
+
     ax.set_ylabel(label)
     ax.set_xlabel('')
-    ax.legend()
-    ax.set_title(make_title(title, default=cst_label(data.name, unit=False)))
-    ax = translate_ax(ax, lang=lang)
+    ax.legend(handlelength=1.5)
+    # ax.set_title(make_title(title, default=cst_label(data.name, unit=False)))
+    # ax = translate_ax(ax, lang=lang)
     return ax.get_figure()
 
 
 ########################################################################################################################
-def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None, unit=None, title=None,
+def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None,
                                 major_freq='h', minor_freq='15min', rasterized=True) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
