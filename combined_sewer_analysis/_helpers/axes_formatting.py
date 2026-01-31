@@ -365,29 +365,6 @@ def plot_correlation_monthly_daily(a, b, lower_quantile=0.25, higher_quantile=0.
     return fig, ax
 
 
-def init_zero_axes_figure():
-    from mpl_toolkits.axisartist.axislines import AxesZero
-
-    fig = plt.figure()
-    ax = fig.add_subplot(axes_class=AxesZero)
-
-    for direction in ["xzero", "yzero"]:
-        # adds arrows at the ends of each axis
-        ax.axis[direction].set_axisline_style("-|>")
-
-        # adds X and Y-axis from the origin
-        ax.axis[direction].set_visible(True)
-
-    for direction in ["left", "right", "bottom", "top"]:
-        # hides borders
-        ax.axis[direction].set_visible(False)
-
-    # ax.spines[["left", "bottom"]].set_position(("data", 0))
-    # ax.spines[["top", "right"]].set_visible(False)
-    # ax.set_aspect('equal')
-    return fig, ax
-
-
 def format_timedelta_xaxis(ax: plt.Axes, index: pd.TimedeltaIndex, *, short: bool = False, german: bool = False) -> None:
     """
     Format the x-axis of a matplotlib Axes for a TimedeltaIndex, setting ticks and labels at full intervals.
@@ -446,7 +423,7 @@ def format_timedelta_xaxis(ax: plt.Axes, index: pd.TimedeltaIndex, *, short: boo
     tick_locs = []
     tick_labels = []
 
-    from sww.libs.timeseries.stats.freqs import timedelta_readable
+    from .freqs import timedelta_readable
     current = start
     while current <= end:
         tick_locs.append(current.total_seconds()*1e9)

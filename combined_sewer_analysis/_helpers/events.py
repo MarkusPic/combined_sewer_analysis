@@ -49,40 +49,6 @@ def monotonic_error_table(date_time_index):
     return events
 
 
-def fix_monotonic_errors(df, verbose=False):
-    """Delete backward time jumps until index is monotonically increasing relative to index before jump"""
-    df_clean = df.copy()
-
-    from sww.libs.timeseries.stats import monotonic_error_table
-    events_monotonic_errors = monotonic_error_table(df.index)
-    if events_monotonic_errors.empty:
-        if verbose:
-            print('no monotonic errors found')
-    else:
-        for _, occurence in events_monotonic_errors.iterrows():
-            i = df_clean.index.get_loc(occurence['time_of_reset'])
-            index = df_clean.index
-            if verbose:
-                print('---')
-                print(i, occurence['time_of_reset'])
-            # j = index[i+1:][index[i+1:] > index[i]].idxmin()
-            first_later_date = index[i + 1:][index[i + 1:] > index[i]].min()
-            j = index.get_loc(first_later_date)
-
-            if verbose:
-                print(index[i:j + 1].map(str).to_list())
-                print(j, first_later_date)
-            k = i + 1
-            while df_clean.iloc[k].name < occurence['time_of_reset']:
-                if verbose: print('drop', k, df_clean.iloc[k].name)
-                df_clean.drop(df_clean.iloc[k].name, inplace=True)
-
-    if verbose:
-        events_monotonic_errors = monotonic_error_table(df_clean.index)
-        if not events_monotonic_errors.empty:
-            print(events_monotonic_errors)
-    return df_clean
-
 
 def time_delta_table(date_time_index, timedelta=Timedelta(minutes=1)):
     """

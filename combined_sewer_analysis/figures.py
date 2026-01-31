@@ -10,7 +10,7 @@ from scipy.stats import norm
 from ._helpers.event_plots import add_event_marker, event_line_axes
 from ._helpers.legend_helpers import add_custom_legend, get_legend_dict
 from ._helpers.axes_formatting import diurnal_axes, weekly_x_axes
-from ._helpers.events import filter_events, span_table
+from ._helpers.events import filter_events, span_table, event_duration
 from ._helpers.pivot_tables import compare_week_table, compare_daily_times_table
 from ._helpers.debug_helpers import check
 from ._helpers.plot_helpers import daykind_color, XLABEL_DIURNAL
@@ -502,15 +502,17 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
         school_free['end'] = school_free['end'].dt.tz_localize(level.index.tz)
         school_free = filter_events(school_free, level.index[0], level.index[-1])
 
+        school_free = school_free[event_duration(school_free) > pd.Timedelta(days=5)]
+
         school_holidays = school_free[school_free['Bemerkungen'] != 'Covid-19']
-        add_event_marker(ax, school_holidays, 'yellow', 0.7, label)
+        add_event_marker(ax, school_holidays, '#e6e6a1', 0.7, 'School holiday')
 
         covid_free = school_free[school_free['Bemerkungen'] == 'Covid-19']
         add_event_marker(ax, covid_free, 'lightgray', 0.7, 'Covid-19')
 
     if mark_holidays_business:
         hd = get_holidays(list(range(level.index[0].year, level.index[-1].year)), state='ST')
-        _label = 'Business Holiday'
+        _label = 'Business holiday'
         for day, name in hd.items():
             ax.axvspan(day, day + pd.Timedelta(days=1, seconds=-1), color='red', alpha=0.6, label=_label)
             _label = None

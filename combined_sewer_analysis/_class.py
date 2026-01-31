@@ -14,10 +14,10 @@ from ._helpers.pickle_helpers import read_pickle, write_pickle
 from .definitions import ARITHMETIC, STD_TO_MAD
 from .date_analysis import diff_day_type
 
-from sww.libs.timeseries.stats.events import combine_events, span_table, event_duration
-from sww.libs.timeseries.stats.events_converter import mark_event_bool
-from sww.libs.timeseries.stats.freqs import guess_freq
-from sww.libs.timeseries.stats.wastewater import calculate_load_rate
+from ._helpers.events import combine_events, span_table, event_duration
+from ._helpers.events_converter import mark_event_bool
+from ._helpers.freqs import guess_freq
+from ._helpers.wastewater import calculate_load_rate
 
 
 def isfile(fn):
@@ -1139,7 +1139,7 @@ class AnalyseData:
         axes[1].set_ylim(-200, 200)
         df[['DW-RESIDUALS', ]].plot(ax=axes[2])
 
-        from sww.libs.timeseries.plots.event_plots import add_event_marker
+        from ._helpers.event_plots import add_event_marker
         dw_bool = df[L.DW_BOOL].mask(self.ts.isnull(), False)
         dw_table = span_table(span_bool=dw_bool)
         for ax in axes:
