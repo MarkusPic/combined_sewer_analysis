@@ -6,9 +6,9 @@ from ._class import AnalyseData
 
 @timeit
 def est_best_daily_grouping(data: AnalyseData):
-    data.day_kind_detail = 9  # temporary
-    est_best_shift_time(data)
-    data.get_analysis_grouper()
+    data.day_categorization = 9  # temporary
+    estimate_best_day_boundary_offset(data)
+    data.analysis_grouper()
     all_means = data.get_dw_mean_table()
 
     """
@@ -95,28 +95,28 @@ def est_best_daily_grouping(data: AnalyseData):
 
     data._grouper_analysis = None
     data._agg_dw_mean = None
-    data.day_kind_detail = 'best'
+    data.day_categorization = 'best'
     # self._day_category_index = None
-    est_best_shift_time(data)
+    estimate_best_day_boundary_offset(data)
 
 
 @timeit
-def est_best_shift_time(data: AnalyseData):
-    # TODO: est_best_shift_time: beta testing
+def estimate_best_day_boundary_offset(data: AnalyseData):
+    # TODO: estimate_best_day_boundary_offset: beta testing
 
-    # fn = path('{}_best_time_shift_{}'.format(self.name, self.day_kind_detail))
+    # fn = path('{}_best_time_shift_{}'.format(self.name, self.day_categorization))
 
     # reset_day_kind = False
-    # if self.day_kind_detail == 'best':
+    # if self.day_categorization == 'best':
     #     reset_day_kind = True
-    #     self.day_kind_detail = 9  # temporary
+    #     self.day_categorization = 9  # temporary
 
     fn = data.filename('best_time_shift')
     if fn.is_file():
-        data.shift_delta = data._read(fn)
+        data.day_boundary_offset = data._read(fn)
     else:
 
-        data.get_analysis_grouper()
+        data.analysis_grouper()
         all_means = data.get_dw_mean_table()
         diff = pd.Series(index=all_means.index, data=0)
         cols = all_means.columns.tolist()
@@ -165,20 +165,19 @@ def est_best_shift_time(data: AnalyseData):
         plt.savefig('test.pdf')
         """  # testing
 
-        data.shift_delta = pd.Timedelta(hours=day_time.hour, minutes=day_time.minute)
+        data.day_boundary_offset = pd.Timedelta(hours=day_time.hour, minutes=day_time.minute)
 
-        data._write(data.shift_delta, fn)
+        data._write(data.day_boundary_offset, fn)
 
         data._grouper_analysis = None
         data._agg_dw_mean = None
-        data.shift_times()
         data._day_category_index = None
     # if reset_day_kind:
-    #     self.day_kind_detail = 'best'
+    #     self.day_categorization = 'best'
     #     self._day_category_index = None
 
 
-def est_best_shift_time2(data: AnalyseData):
+def estimate_best_day_boundary_offset2(data: AnalyseData):
     from combined_sewer_analysis._helpers.calculation_helpers import mad_
     dev = data.ts.groupby(data.ts.index.time).agg(mad_)
     dev.plot().get_figure().show()

@@ -5,21 +5,6 @@ import pandas as pd
 
 from pandas import DatetimeIndex, Series, Timedelta, Timestamp, Index, date_range, to_datetime, read_csv
 
-_states = {
-    'B': 1,
-    'K': 2,
-    'N': 3,
-    'O': 4,
-    'S': 5,
-    'ST': 6,
-    'T': 7,
-    'V': 8,
-    'W': 9
-}
-HOLIDAY_CONFIG = {'country': 'AT',
-                  'subdiv': _states['ST']
-                  }
-
 
 class DAY_KIND:
     ALL_DAYS = 'Day'
@@ -34,24 +19,15 @@ class DAY_KIND:
 
     @staticmethod
     def sorter(li):
-        order = [ALL_DAYS, WORKDAY, *list(calendar.day_name), NO_WORKDAY, WEEKEND, SUN_HOLIDAY, HOLIDAY, BRIDGE_DAY, FAKE_FRIDAY]
+        order = [DAY_KIND.ALL_DAYS, DAY_KIND.WORKDAY, *list(calendar.day_name), DAY_KIND.NO_WORKDAY, DAY_KIND.WEEKEND, DAY_KIND.SUN_HOLIDAY, DAY_KIND.HOLIDAY, DAY_KIND.BRIDGE_DAY, DAY_KIND.FAKE_FRIDAY]
         reordered = [item for item in order if item in li] + [item for item in li if item not in order]
         return reordered
 
-ALL_DAYS = 'Day'
-WORKDAY = 'Workday'
-NO_WORKDAY = 'Non-working'
-WEEKEND = 'Weekend'
-SATURDAY = 'Saturday'
-SUN_HOLIDAY = 'Sun-&Holiday'
-HOLIDAY = 'Holiday'
-BRIDGE_DAY = 'Bridge Day'
-FAKE_FRIDAY = 'Fake Friday'  # day before a holiday
+    LI_WEEKDAYS = list(calendar.day_name)
+    LI_WEEKDAYS_SUNDAY_FIRST = [LI_WEEKDAYS[-1], *LI_WEEKDAYS[:-1]]
 
-"""
-austrian national holidays
-"""
 
+################################################################################################
 """
 https://www.feiertagskalender.ch/ferien.php?geo=3129
 """
@@ -87,6 +63,27 @@ def is_school_holiday(time_data):
         for _, holiday_period in school_holidays.iterrows():
             bool_series[holiday_period['Beginn']:holiday_period['Ende']] = True
         return bool_series
+
+
+################################################################################################
+"""
+austrian national holidays
+"""
+_states = {
+    'B': 1,
+    'K': 2,
+    'N': 3,
+    'O': 4,
+    'S': 5,
+    'ST': 6,
+    'T': 7,
+    'V': 8,
+    'W': 9
+}
+
+HOLIDAY_CONFIG = {'country': 'AT',
+                  'subdiv': _states['ST']
+                  }
 
 
 def get_holidays(year, **kwargs):
@@ -190,7 +187,7 @@ def is_bridge_day(time_data, within_days=1, **kwargs):
             return Index(time_data_date).isin(bridge_days[bridge_days].index.date)
 
 
-def get_kind_of_day(time_stamp, level_of_detail=3):
+def get_day_category(time_stamp, level_of_detail=3):
     """
     get the category of the day
 
@@ -227,7 +224,7 @@ def get_kind_of_day(time_stamp, level_of_detail=3):
             return DAY_KIND.WORKDAY
 
     elif level_of_detail == 3.11:  # Metadier et. al 2011
-        day = get_kind_of_day(time_stamp, level_of_detail=2)
+        day = get_day_category(time_stamp, level_of_detail=2)
         if day == DAY_KIND.WORKDAY:
             if is_school_holiday(day):
                 return day + ' (inside school holidays)'
@@ -261,7 +258,7 @@ def get_kind_of_day(time_stamp, level_of_detail=3):
             return time_stamp.day_name()
 
 
-def diff_day_type(index, level_of_detail=3., add_number=False, as_series=False):
+def get_day_category_index(index, level_of_detail=3., add_number=False, as_series=False):
     """
     Get labels for the kind of the day.
 
@@ -276,7 +273,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False, as_series=False):
     """
     # check('DayType0')
     if isinstance(index, Timestamp):
-        return get_kind_of_day(index, level_of_detail=level_of_detail)
+        return get_day_category(index, level_of_detail=level_of_detail)
 
     elif isinstance(index, DatetimeIndex):
         if level_of_detail == 1:
@@ -300,7 +297,7 @@ def diff_day_type(index, level_of_detail=3., add_number=False, as_series=False):
             days.loc[holidays | (dayofweek == 6)] = DAY_KIND.SUN_HOLIDAY
 
         elif level_of_detail == 3.11:  # Metadier et. al 2011
-            days = diff_day_type(index, level_of_detail=2)
+            days = get_day_category_index(index, level_of_detail=2)
             bool_school_holiday = is_school_holiday(index)
             days[bool_school_holiday & (days == 'Workday')] += ' (inside school holidays)'
             days[~bool_school_holiday & (days == 'Workday')] += ' (outside school holidays)'

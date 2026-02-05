@@ -13,12 +13,12 @@ from combined_sewer_analysis.figures import (diurnal_density_full, compare_all_d
 from combined_sewer_analysis.plots import compare_timestamp_distribution
 
 
-def get_available_data_ratio(data: AnalyseData, pth: Path, level_of_detail=10):
+def get_available_data_ratio(data: AnalyseData, pth: Path, day_categorization=10):
     res = {}
     dw_bool = data.get_dw_bool_series()
     crit = data.get_criterion_series()
 
-    groupby = data.ts.groupby([data.get_diff_day_type(data._shifted_ts.index, level_of_detail=level_of_detail), data.ts.index.time])
+    groupby = data.get_analysis_grouper(day_categorization=day_categorization)
 
     for (day_kind, timestamp), series in groupby:
         series_ = series.dropna()
@@ -41,11 +41,11 @@ def get_available_data_ratio(data: AnalyseData, pth: Path, level_of_detail=10):
 
     md = df.groupby(axis=0, level=0).mean().round(0).astype(int).to_markdown()
     print(md)
-    (pth / f'table_available_data_ratio_by_kind|level_of_detail={level_of_detail}.md').write_text(md)
+    (pth / f'table_available_data_ratio_by_kind|day_categorization={day_categorization}.md').write_text(md)
 
     md = df.describe().round(0).astype(int).to_markdown()
     print(md)
-    (pth / f'table_available_data_ratio_overall|level_of_detail={level_of_detail}.md').write_text(md)
+    (pth / f'table_available_data_ratio_overall|day_categorization={day_categorization}.md').write_text(md)
 
 
 def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tuple[float | int], unit='L/s'):
@@ -89,10 +89,8 @@ def create_default_analysis_results(data_class: AnalyseData, pth: Path, ylim: tu
     # plot tagesgang mittelwert für alle tageskategorien
     fn = pth / 'weekly_density_plot.png'
     if override or not fn.is_file():
-        data8 = AnalyseData(data_class.ts, limit=data_class.limit, kind=data_class.arithmetic, day_kind_detail=8,
-                            file_path=data_class.temp_file_path,
-                            make_temp_files=False, est_best_shift_time=False,
-                            smooth_window=data_class.smooth_window).set_number_day_labels()
+        data8 = AnalyseData(data_class.ts, limit=data_class.limit, kind=data_class.arithmetic, day_categorization=8,
+                            smooth_window=data_class.smooth_window)
 
         fig, ax = weekly_density_plot(data8)
         ax.set_ylim(*ylim)

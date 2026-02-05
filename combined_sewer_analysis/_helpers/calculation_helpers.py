@@ -223,9 +223,9 @@ def calc_dry_variation_split(_variation, kind, time_stamp=None, infer_mean=False
 #     return DataFrame({'UPPER': upper, 'LOWER': lower}, index=variation.index)
 
 
-# def calc_criterion(s, limit, dry_mean, dry_upper_variance, dry_lower_variance, day_kind_detail):
+# def calc_criterion(s, limit, dry_mean, dry_upper_variance, dry_lower_variance, day_categorization):
 #     try:
-#         day = get_kind_of_day(s.index[0], level_of_detail=day_kind_detail)
+#         day = get_kind_of_day(s.index[0], level_of_detail=day_categorization)
 #         index = s.index.time
 #         # new = new.reindex(dry_mean.index)
 #         diff = s.values - dry_mean[day][index]

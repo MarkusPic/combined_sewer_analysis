@@ -8,7 +8,7 @@ __version__ = "1.0.0"
 from combined_sewer_analysis.date_analysis import DAY_KIND
 
 
-def daykind_color(day, day_kind_detail=10):
+def daykind_color(day, day_categorization=10):
     COLORS = {DAY_KIND.ALL_DAYS: '#ED1A52',  # TU ROT  # 'gray',  # '#377EB8'
               DAY_KIND.WORKDAY: '#377EB8',  # blue
               DAY_KIND.NO_WORKDAY: '#E41A1C',  # red
@@ -20,7 +20,7 @@ def daykind_color(day, day_kind_detail=10):
               DAY_KIND.BRIDGE_DAY: '#777'
     }
 
-    if day_kind_detail >= 7:
+    if day_categorization >= 7:
         COLORS.update({'1 Monday': '#5E4FA2',
                        '2 Tuesday': '#3288BD',
                        '3 Wednesday': '#66C2A5',

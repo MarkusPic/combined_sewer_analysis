@@ -231,14 +231,13 @@ def diurnal_density_full_heatmap(ts: pd.Series, major_freq='1h', minor_freq='15m
 
 def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black', smooth=None) -> tuple[plt.Figure, plt.Axes]:
     li_weekdays = list(calendar.day_name)
-    ts_normal_week = data.ts[np.isin(data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
+    ts_normal_week = data.ts[np.isin(data.get_day_category_index(level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
     data_table = compare_week_table(ts_normal_week, sunday_first=False)
     ax = data_table.T.plot(alpha=0.05, legend=False, color=color, ax=ax, rasterized=True)
 
     ax.set_title('Weekly')
 
     if add_mean:
-        # data.set_number_day_labels()
         data7_mean = data.get_dw_mean_table(smooth=None).copy()
         # for c in (FAKE_FRIDAY, BRIDGE_DAY, HOLIDAY,
         #           f'5.1 {FAKE_FRIDAY}', f'6.1 {BRIDGE_DAY}', f'8 {HOLIDAY}'):
@@ -260,10 +259,7 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
         data7_mean2.index = pd.to_timedelta([i.hour for i in data7_mean2.index], unit='h') + \
                             pd.to_timedelta([i.minute for i in data7_mean2.index], unit='m')
 
-        if data._number_day_labels:
-            data7_mean2 = data7_mean2[[f'{i} {d}' for i, d in enumerate(li_weekdays, start=1)]]
-        else:
-            data7_mean2 = data7_mean2[li_weekdays]
+        data7_mean2 = data7_mean2[li_weekdays]
 
         data7_mean2.columns = pd.timedelta_range(start=pd.Timedelta(0), end=pd.Timedelta(days=6), freq='d')
 
@@ -281,7 +277,7 @@ def weekly_density_plot(data: AnalyseData, ax=None, add_mean=True, color='black'
 
 def weekly_density_plot_heatmap(data: AnalyseData, ax=None, add_mean=True, cmap='Greys', smooth=None, xbins=500, ybins=100, ymax=100, add_colorbar=False, **kwargs) -> tuple[plt.Figure, plt.Axes]:
     li_weekdays = list(calendar.day_name)
-    ts_normal_week = data.ts[np.isin(data.get_diff_day_type(data._shifted_ts.index, level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
+    ts_normal_week = data.ts[np.isin(data.get_day_category_index(level_of_detail=10, add_number=False), li_weekdays)].copy().dropna()
     ts_normal_week = ts_normal_week[ts_normal_week < ymax]
     sec = ts_normal_week.index.weekday*24*60*60 + ts_normal_week.index.hour*60*60 + ts_normal_week.index.minute*60 + ts_normal_week.index.second
 
@@ -338,7 +334,7 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
 
     # ---
     res = {}
-    for (day_kind, timestamp), series in data.get_analysis_grouper():
+    for (day_kind, timestamp), series in data.analysis_grouper():
         # nur für volle Stunden
         if timestamp.minute != 0:
             continue
@@ -425,17 +421,14 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     Returns:
         plt.Figure:
     """
-    if data.day_kind_detail == 8:
-        data.set_number_day_labels()
-
     mean = data.get_dw_mean_table(smooth=smooth)
     if add_bounds:
         agg_dry_bound = data.get_dw_bound_table(smooth=smooth)
 
     ax = None
-    for day in mean.columns:
+    for day in DAY_KIND.sorter(mean.columns):
         print(day)
-        ax = mean[day].plot(ax=ax, color=daykind_color(day, data.day_kind_detail), legend=True)
+        ax = mean[day].plot(ax=ax, color=daykind_color(day, data.day_categorization), legend=True)
         if add_bounds:
             ax.fill_between(mean.index,
                             agg_dry_bound[(L.LOWER, day)],
@@ -454,8 +447,7 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
 
 
 def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min', ax=None):
-    data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_kind_detail=10, file_path=data.temp_file_path,
-                         make_temp_files=False, est_best_shift_time=False, smooth_window=data.smooth_window)#.set_number_day_labels()
+    data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_categorization=10, smooth_window=data.smooth_window)
 
     mean = data10.get_dw_mean_table(smooth=data.smooth_window if smooth is None else smooth)
 
@@ -476,7 +468,7 @@ def dry_percentage(data: AnalyseData, unit=None, title=None):
         lower = percentileofscore(s, data.upper_bound.loc[day_time, day])
         return upper - lower
 
-    res = data.get_analysis_grouper().apply(calc_dry_perc).unstack().T
+    res = data.analysis_grouper().apply(calc_dry_perc).unstack().T
     ax = res.plot()
 
     # title = make_title(title, default=get_compare_diurnal_title(name=data.name, kind=data.arithmetic, limit=data.limit))
@@ -490,9 +482,9 @@ def dry_percentage(data: AnalyseData, unit=None, title=None):
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
               title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False):
-    _g = data.get_criterion_level_series(smooth_window=smooth_window).resample('7d')
+    _g = data.get_criterion_level_series(smooth_window=smooth_window).resample(smooth_window)
     level = _g.mean()
-    level = level[_g.count() > 0]
+    level = level[_g.count() > 0][level != 0].asfreq(level.index.freq)
     ax = level.rename('DW level').plot(color=color)
     ax.set_xlim(level.index[0], level.index[-1])
 

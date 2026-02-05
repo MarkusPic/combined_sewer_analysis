@@ -12,7 +12,7 @@ from ._helpers.debug_helpers import timeit, lev
 from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation_split
 from ._helpers.pickle_helpers import read_pickle, write_pickle
 from .definitions import ARITHMETIC, STD_TO_MAD
-from .date_analysis import diff_day_type
+from .date_analysis import get_day_category_index
 
 from ._helpers.events import combine_events, span_table, event_duration
 from ._helpers.events_converter import mark_event_bool
@@ -66,7 +66,7 @@ def smoother(method):
 class AnalyseData:
     """
     Attributes:
-        shift_delta (Timedelta): delta to shift the time-series. Time when the values of all days are the most simular.
+        day_boundary_offset (Timedelta): delta to shift the time-series. Time when the values of all days are the most simular.
         smooth_window (int): Number of values used to smooth results. Default=20 -> with a frequency of 1 min -> smooth-windows=20 min
     """
     @staticmethod
@@ -83,18 +83,17 @@ class AnalyseData:
         return read_pickle(fn)
 
     def __str__(self):
-        return 'AnalyseData({}, kind={}, dkd={})'.format(self.name, self.arithmetic, self.day_kind_detail)
+        return 'AnalyseData({}, kind={}, dkd={})'.format(self.name, self.arithmetic, self.day_categorization)
 
     def __init__(self, ts,
                  kind=ARITHMETIC.MEDIAN__MAD,
                  limit=2*STD_TO_MAD,
-                 day_kind_detail=None,
+                 day_categorization=None,
                  ww_crit_limit=100,
                  dw_crit_limit=100,
-                 make_temp_files=False,
-                 file_path='.',
-                 est_best_shift_time=False,
-                 shift_delta=None,
+                 temp_files_path=None,
+                 estimate_best_day_boundary_offset=False,
+                 day_boundary_offset=None,
                  min_rain_period=Timedelta(hours=2),
                  trail_period=Timedelta(hours=4),
                  dry_level_window=pd.Timedelta(days=2),
@@ -106,12 +105,11 @@ class AnalyseData:
             ts (pd.Seres): with local timezone for diurnal pattern recognition.
             kind (int): 0,6,8,97,98,1,2,7,99
             limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather. 2.965 MAD = 2 std = 95%
-            day_kind_detail (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
+            day_categorization (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
             ... | default=automated
-            make_temp_files (bool): Whether to make temporary files.
-            file_path (str | Path): Path where the temporary files should be saved.
-            est_best_shift_time (bool): If the time-shift should be automatically estimated.
-            shift_delta (Timedelta or str or None): delta to shift the time-series to set a time for a new day.
+            temp_files_path (str | Path): Path where the temporary files should be saved.
+            estimate_best_day_boundary_offset (bool): If the time-shift should be automatically estimated.
+            day_boundary_offset (Timedelta or str or None): delta to shift the time-series to set a time for a new day.
             min_rain_period (Timedelta): Minimum duration from which it is a rain event. Shorter events will be ignored.
             trail_period (Timedelta): Duration for combining rain events + duration after an event to restore dw-conditions.
         """
@@ -128,8 +126,7 @@ class AnalyseData:
         self.ww_crit_limit = ww_crit_limit
 
         # temporary file path
-        self.temp_file_path = Path(file_path)
-        self.make_temp_files = make_temp_files
+        self.temp_files_path = temp_files_path
 
         # ------
         # per day and time
@@ -157,10 +154,6 @@ class AnalyseData:
         self._dry_weather_events = None
         self._wet_weather_events = None
 
-        # # analyze helpers
-        # add a number to the day labels
-        self._number_day_labels = False  # bool
-
         # over time and day-category
         self._grouper_analysis = None  # pd.Grouper
         # over day-category
@@ -172,26 +165,26 @@ class AnalyseData:
         # 3.1: (weekdays / Saturday / Sun-& Holiday
         # 8: ("weekday_name" / holiday)
 
-        if day_kind_detail is None:
-            day_kind_detail = 'best'
+        if day_categorization is None:
+            day_categorization = 'best'
 
-        self.day_kind_detail = day_kind_detail
+        self.day_categorization = day_categorization
         self._day_category_index = None  # pd.CategoricalIndex
 
         # time series
-        self.shift_delta = shift_delta
-        self._shifted_ts = self.ts.copy()  # ts only for day-category calculation
+        self.day_boundary_offset = day_boundary_offset  # ts only for day-category calculation
 
-        if est_best_shift_time:
-            self.shift_delta = 'auto'
+        if estimate_best_day_boundary_offset:
+            self.day_boundary_offset = 'auto'
 
-        if day_kind_detail == 1:
-            self.shift_delta = None
-        elif self.shift_delta == 'auto':
-            from .estimate_parameters import est_best_shift_time
-            est_best_shift_time(self)
-        else:
-            self.shift_times()
+        if day_categorization == 1:
+            self.day_boundary_offset = None
+        elif self.day_boundary_offset == 'auto':
+            from .estimate_parameters import estimate_best_day_boundary_offset
+            estimate_best_day_boundary_offset(self)
+
+        if self.day_boundary_offset is None:
+            self.day_boundary_offset = pd.Timedelta(hours=0)
 
         # self.est_best_daily_grouping()
 
@@ -227,41 +220,24 @@ class AnalyseData:
         return args_bool
 
     def filename(self, basename):
-        if not self.make_temp_files:
-            return ''
-
-        else:
-            folder = f'{self.name} # kind={self.day_kind_detail} # shift={self.shift_label}'.replace('.', '-')
-            dir_ = self.temp_file_path / folder
+        if self.make_temp_files:
+            folder = f'{self.name} # kind={self.day_categorization} # shift={self.day_boundary_offset_label}'.replace('.', '-')
+            dir_ = Path(self.temp_files_path) / folder
             if not dir_.exists():
                 dir_.mkdir()  # parents=True
 
             return dir_ / basename
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def set_number_day_labels(self):
-        self._number_day_labels = True
-        return self
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def shift_times(self):
-        if self.shift_delta is None:
-            self._shifted_ts.index = self.ts.index.copy()
         else:
-            self._shifted_ts.index = self.ts.index.copy() - self.shift_delta
+            return ''
 
-    def manual_time_shift(self, shift_delta):
-        self.shift_delta = shift_delta
-        self.shift_times()
-        return self
-
+    # ------------------------------------------------------------------------------------------------------------------
     @property
-    def shift_label(self):
-        if (self.shift_delta is None) or (self.shift_delta == Timedelta(hours=0)):
+    def day_boundary_offset_label(self):
+        if (self.day_boundary_offset is None) or (self.day_boundary_offset == Timedelta(hours=0)):
             return '-'
-        if self.shift_delta < Timedelta(hours=0):
-            return '-' + ''.join(['{}{}'.format(item, key[0] + ('s' if ('seconds' in key and key != 'seconds') else '')) for key, item in (-self.shift_delta).components._asdict().items() if item != 0])
-        return ''.join(['{}{}'.format(item, key[0] + ('s' if ('seconds' in key and key != 'seconds') else '')) for key, item in self.shift_delta.components._asdict().items() if item != 0])
+        if self.day_boundary_offset < Timedelta(hours=0):
+            return '-' + ''.join(['{}{}'.format(item, key[0] + ('s' if ('seconds' in key and key != 'seconds') else '')) for key, item in (-self.day_boundary_offset).components._asdict().items() if item != 0])
+        return ''.join(['{}{}'.format(item, key[0] + ('s' if ('seconds' in key and key != 'seconds') else '')) for key, item in self.day_boundary_offset.components._asdict().items() if item != 0])
 
     @property
     def guessed_freq(self):
@@ -274,26 +250,26 @@ class AnalyseData:
 
     # ------------------------------------------------------------------------------------------------------------------
     @timeit
-    def get_diff_day_type(self, index, level_of_detail=None, add_number=None, as_series=False):
-        return diff_day_type(index,
-                             level_of_detail=level_of_detail or self.day_kind_detail,
-                             add_number=add_number if add_number is not None else self._number_day_labels,
-                             as_series=as_series)
+    def get_day_category_index(self, index=None, level_of_detail=None, add_number=False, as_series=False):
+        return get_day_category_index((self.ts.index - self.day_boundary_offset) if index is None else index,
+                                      level_of_detail=level_of_detail or self.day_categorization,
+                                      add_number=add_number,
+                                      as_series=as_series)
 
     @property
     def day_category_index(self) -> pd.CategoricalIndex:
         if self._day_category_index is None:
-            fn = self.filename(f'day_category_index # num={self._number_day_labels}')
+            fn = self.filename('day_category_index')
 
             if isfile(fn):
                 self._day_category_index = self._read(fn, dtype=pd.Series).values
             else:
-                if self.day_kind_detail == 'best':
+                if self.day_categorization == 'best':
                     from combined_sewer_analysis.estimate_parameters import est_best_daily_grouping
                     est_best_daily_grouping(self)
 
                 else:
-                    self._day_category_index = self.get_diff_day_type(self._shifted_ts.index)
+                    self._day_category_index = self.get_day_category_index()
                 self._write(pd.Series(self._day_category_index, name='Day Category Index'), fn)
 
         return self._day_category_index
@@ -302,7 +278,10 @@ class AnalyseData:
         return self.day_category_index.categories.tolist()
 
     @timeit
-    def get_analysis_grouper(self):
+    def get_analysis_grouper(self, day_categorization=None, add_number=None):
+        return self.ts.groupby([self.get_day_category_index(level_of_detail=day_categorization, add_number=add_number), self.ts.index.time], observed=False)
+
+    def analysis_grouper(self):
         """
         Groups data in [day-category, time-of-day] groups.
 
@@ -314,7 +293,7 @@ class AnalyseData:
             if isfile(fn):
                 self._grouper_analysis = self._read(fn)
             else:
-                self._grouper_analysis = self.ts.groupby([self.day_category_index, self.ts.index.time], observed=False)
+                self._grouper_analysis = self.get_analysis_grouper()
                 self._write(self._grouper_analysis, fn)
         return self._grouper_analysis
 
@@ -367,7 +346,7 @@ class AnalyseData:
             agg_dw_mean = self._read(fn)
         else:
             agg_dw_mean = (
-                self.get_analysis_grouper()
+                self.analysis_grouper()
                 .agg(calc_dry_mean, kind=arithmetic)
                 .unstack(0)
             )
@@ -394,7 +373,7 @@ class AnalyseData:
                                                         time_stamp=s.name[1])
                 return {L.UPPER: upper, L.LOWER: lower, L.MEAN: np.mean([upper, lower])}
 
-            variances = self.get_analysis_grouper().apply(_vars)  # multiindex: day - time - (lower/upper)
+            variances = self.analysis_grouper().apply(_vars)  # multiindex: day - time - (lower/upper)
             variances = variances.unstack([2, 0])
 
             self._write(variances, fn)
@@ -439,7 +418,7 @@ class AnalyseData:
             v = s[dw_bool[s.index]]
             return {L.UPPER: v.quantile(0.975), L.LOWER: v.quantile(0.025)}
 
-        bound = self.get_analysis_grouper().apply(_bounds)  # multiindex: day - time - (lower/upper)
+        bound = self.analysis_grouper().apply(_bounds)  # multiindex: day - time - (lower/upper)
         bound = bound.unstack([2, 0])
         return bound
 
@@ -837,7 +816,7 @@ class AnalyseData:
             # ax.set_ylim(-100, 70)
             fig.show()
 
-            c = AnalyseData(criterion, day_kind_detail=1)
+            c = AnalyseData(criterion, day_categorization=1)
 
             c.get_dw_mean_table().plot().get_figure().show()
             c.dw_variance_table().plot().get_figure().show()
@@ -846,7 +825,7 @@ class AnalyseData:
             fig, ax = diurnal_density_full(criterion)
             fig.show()
 
-            fig, ax = weekly_density_plot(AnalyseData(criterion, day_kind_detail=8, est_best_shift_time=False))
+            fig, ax = weekly_density_plot(AnalyseData(criterion, day_categorization=8))
             ax.set_ylim(-100, 100)
             fig.set_size_inches(12,8)
             fig.show()
@@ -1114,8 +1093,8 @@ class AnalyseData:
 
     def get_interim_frame(self, date_slice=None):
         df = pd.concat([
-            self.ts.rename('Obs.'),
-            self.get_diff_day_type(self.ts.index, as_series=True).rename('Day-Category'),
+            self.ts.rename('OBSERVED'),
+            self.get_day_category_index(as_series=True).rename('Day-Category'),
             self.get_dw_mean_series(),
             self.get_dw_bool_series(),
             self.get_criterion_series(),
@@ -1127,12 +1106,17 @@ class AnalyseData:
             df = df.loc[date_slice]
         return df
 
-    def get_interim_figure(self, date_slice=None):
+    def get_interim_figure(self, date_slice=None, p=None):
         import matplotlib.pyplot as plt
         df = self.get_interim_frame()
         if date_slice is not None:
             df = df.loc[date_slice]
-        fig, axes = plt.subplots(nrows=3, sharex=True)
+        fig, axes = plt.subplots(nrows=3+int(p is not None), sharex=True)
+        if p is not None:
+            ax_p, *axes = list(axes)
+            ax_p = p.loc[date_slice].plot(ax=ax_p, drawstyle='steps-mid', color='#1E88E5', solid_capstyle='butt', solid_joinstyle='miter', lw=0)
+            ax_p.fill_between(p.loc[date_slice].index, 0, p.loc[date_slice].values, step='mid', zorder=3, color='#1E88E5', capstyle='butt', joinstyle='miter')
+
         df[['Obs.', L.DW_CONTINUUM, L.DW_MEAN]].plot(ax=axes[0])
         df[[L.DW_CRITERION, L.DW_LEVEL]].plot(ax=axes[1])
         # axes[1].set_yscale('log')
@@ -1148,6 +1132,10 @@ class AnalyseData:
         return fig, axes
 
     ####################################################################################################################
+    @property
+    def make_temp_files(self):
+        return isinstance(self.temp_files_path, (str, Path))
+
     def _write(self, data, fn):
         if self.make_temp_files:
             if isinstance(data, (pd.DataFrame, pd.Series)):

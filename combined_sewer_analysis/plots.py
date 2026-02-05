@@ -16,7 +16,7 @@ def compare_timestamp_distribution(data: AnalyseData, pth: Path):
     # crit = data.get_criterion_series()
 
     groupby = data.ts.groupby(
-        [data.get_diff_day_type(data._shifted_ts.index, level_of_detail=2), data.ts.index.time])
+        [data.get_day_category_index(level_of_detail=2), data.ts.index.time])
 
     bin_width = 5
 
