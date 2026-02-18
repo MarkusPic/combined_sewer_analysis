@@ -14,10 +14,10 @@ from ._helpers.events import filter_events, span_table, event_duration
 from ._helpers.pivot_tables import compare_week_table, compare_daily_times_table
 from ._helpers.debug_helpers import check
 from ._helpers.plot_helpers import daykind_color, XLABEL_DIURNAL
+from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean, mad
 
 from ._class import AnalyseData, L
-from ._helpers.calculation_helpers import calc_dry_mean, calc_dry_variation, _calc_dry_mean, mad
-from .date_analysis import get_school_holidays, get_holidays, HOLIDAY, FAKE_FRIDAY, BRIDGE_DAY, DAY_KIND
+from .date_analysis import get_school_holidays, get_holidays, DAY_KIND
 from .definitions import MAD_TO_STD
 
 
@@ -634,7 +634,6 @@ def compare_dw_uncertainty_day_relative(data: AnalyseData, smooth=20,
 
 def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_width=5, set_title=True):
     import seaborn as sns
-    from mp.libs import fitter
     import math
     # ---
     fig, (ax_dry, ax_wet) = plt.subplots(1, 2)  # type: plt.Figure, (plt.Axes, plt.Axes)
@@ -644,10 +643,11 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
                      math.ceil(series_dw.max() / bin_width) * bin_width + bin_width, bin_width)
     # series_dw.hist(bins=bins, density=True, ax=ax_dry)
 
-    sns.histplot(x=series_dw, kde=True, ax=ax_dry, bins=bins)
+    sns.histplot(x=series_dw, kde=True, ax=ax_dry, bins=bins, lw=0.7)
     # sns.kdeplot(data=tips, x="total_bill")
-    sns.rugplot(x=series_dw, ax=ax_dry)
+    # sns.rugplot(x=series_dw, ax=ax_dry)
 
+    # from mp.libs import fitter
     # f = Fitter(deviations[day_kind],
     #            xmin=-abs_range, xmax=abs_range, bins=40,
     #            distributions=['chi2', 'lognorm', 'norm', ], timeout=60)
@@ -660,7 +660,7 @@ def _single_timestamp_distribution(day_kind, timestamp, series, dw_bool, bin_wid
         bins = np.arange(math.floor(series_ww.min() / bin_width) * bin_width,
                          math.ceil(series_ww.max() / bin_width) * bin_width + bin_width, bin_width)
         # series_ww.hist(bins=bins, density=True, ax=ax_wet)
-        sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins)
+        sns.histplot(x=series_ww, kde=True, ax=ax_wet, bins=bins, lw=0)
         # sns.kdeplot(x=series_dw, ax=ax_wet, color='r')
         # sns.kdeplot(data=tips, x="total_bill")
         # sns.rugplot(x=series_ww, ax=ax_wet)

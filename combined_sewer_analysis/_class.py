@@ -1100,6 +1100,8 @@ class AnalyseData:
             self.get_criterion_series(),
             self.get_criterion_level_series(),
             self.get_dw_continuum_series(),
+            self.get_dw_uncertainty_series(),
+            self.get_dw_uncertainty_band_series(),
             self.get_dw_residual_series(self.get_dw_bool_series(fill_na=False)).rename('DW-RESIDUALS')
         ], axis=1)
         if date_slice is not None:

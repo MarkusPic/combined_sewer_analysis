@@ -50,7 +50,7 @@ def availability_axes(ts, ax=None, break_points=None, y_bottom=0, bar_height=1, 
 
     ts_ = ts.copy()
     if ts.index.tz is not None:
-        from sww.libs.timeseries.timezone import TZ
+        from mp.libs.timeseries.timezone import TZ
         ts_.index = ts_.index.tz_convert(TZ.WINTER).tz_localize(None)
     _res = ts_.resample('1d')
     avail_daily = _res.count() / _res.size() * 100
