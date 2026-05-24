@@ -481,11 +481,26 @@ def dry_percentage(data: AnalyseData, unit=None, title=None):
 
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
-              title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False):
+              title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False, add_crit_var=True):
     _g = data.get_criterion_level_series(smooth_window=smooth_window).resample(smooth_window)
     level = _g.mean()
     level = level[_g.count() > 0][level != 0].asfreq(level.index.freq)
-    ax = level.rename('DW level').plot(color=color)
+    ax = level.rename('DW level').plot(color=color, zorder=2)
+
+    # ---
+    if add_crit_var:
+        criterion = data.get_criterion_series()
+        dw_bool = data.get_dw_bool_series(fill_na=False)
+        criterion[~dw_bool] = np.nan
+
+        crit_std = criterion.resample(smooth_window).std()
+
+        # data.get_criterion_level_series(smooth_window=smooth_window).rename('').plot(ax=ax, lw=0.5, color='black')
+        # criterion.plot(ax=ax, lw=0.5, color='black', zorder=0, alpha=.2)
+
+        ax.fill_between(crit_std.index, level-crit_std, level+crit_std, color='C0', alpha=.25, label='Criterion variability', zorder=2)
+
+    # ---
     ax.set_xlim(level.index[0], level.index[-1])
 
     if mark_holidays_school:
