@@ -1043,10 +1043,6 @@ class AnalyseData:
 
         Read from file or calculate and write to file.
 
-        Args:
-            min_rain_period (pandas.Timedelta): minimum period to count as a rain-event_analysis
-            extra_range (pandas.Timedelta): extra time between a dry period and wet weather (no more influence)
-
         Returns:
             pd.DataFrame: index=day-times | columns=day-kinds
         """
