@@ -205,6 +205,9 @@ class AnalyseData:
 
         self.dry_level_window = dry_level_window
 
+        # ----------------
+        self.error_model = None # error model class for creating dw_cont series with random errors
+
     # HELPERS-----------------------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------------------------------
     def check_args(self, **kwargs):  # kind, limit
@@ -1128,6 +1131,17 @@ class AnalyseData:
             add_event_marker(ax, dw_table, label='DW')
 
         return fig, axes
+
+    def set_dw_continuum_series_error_model(self, ar_lags=2, random_state=42):
+        from combined_sewer_analysis.error_model import ResidualUncertaintyModel
+        self.error_model = ResidualUncertaintyModel(ar_lags=ar_lags, random_state=random_state).fit(self)
+
+    def get_dw_continuum_series_with_random_error(self, index, n_samples=100):
+        if index is None:
+            index = self.ts.index
+        if self.error_model is None:
+            self.set_dw_continuum_series_error_model()
+        return self.error_model.sample(index, n_samples=n_samples)
 
     ####################################################################################################################
     @property
