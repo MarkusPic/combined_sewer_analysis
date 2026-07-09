@@ -1118,7 +1118,7 @@ class AnalyseData:
             ax_p = p.loc[date_slice].plot(ax=ax_p, drawstyle='steps-mid', color='#1E88E5', solid_capstyle='butt', solid_joinstyle='miter', lw=0)
             ax_p.fill_between(p.loc[date_slice].index, 0, p.loc[date_slice].values, step='mid', zorder=3, color='#1E88E5', capstyle='butt', joinstyle='miter')
 
-        df[['Obs.', L.DW_CONTINUUM, L.DW_MEAN]].plot(ax=axes[0])
+        df[['OBSERVED', L.DW_CONTINUUM, L.DW_MEAN]].plot(ax=axes[0])
         df[[L.DW_CRITERION, L.DW_LEVEL]].plot(ax=axes[1])
         # axes[1].set_yscale('log')
         axes[1].set_ylim(-200, 200)
