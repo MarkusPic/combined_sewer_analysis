@@ -1143,6 +1143,12 @@ class AnalyseData:
             self.set_dw_continuum_series_error_model()
         return self.error_model.sample(index, n_samples=n_samples)
 
+    def get_dry_filling_series_with_random_error(self, start, end, n_samples=100):
+        c = self.get_dw_continuum_series_with_random_error(self.ts.loc[start:end].index, n_samples)
+        dw_bool = self.get_dw_bool_series(fill_na=False, start=start, end=end)
+        c.loc[dw_bool, :] = self.ts.loc[start:end].loc[dw_bool].to_numpy()[:, None]
+        return c
+
     ####################################################################################################################
     @property
     def make_temp_files(self):
