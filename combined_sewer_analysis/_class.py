@@ -586,7 +586,7 @@ class AnalyseData:
             else:
                 self._dw_bool_series = dw_bool_series.rename(L.DW_BOOL)
 
-        return self._dw_bool_series[slice(start, end)].mask(self.ts.isnull(), fill_na)
+        return self._dw_bool_series[slice(start, end)].mask(self.ts.isnull(), fill_na).astype(bool if isinstance(fill_na, bool) else object)
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_wet_weather_events(self, min_rain_period=None, trail_period=None, no_cache=False):
