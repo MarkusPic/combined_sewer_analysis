@@ -955,7 +955,7 @@ class AnalyseData:
     # ------------------------------------------------------------------------------------------------------------------
     # @timeit
     @smoother
-    def get_dry_filling_series(self, which: Literal[L.UPPER, L.LOWER, L.MEAN, L.AUTO] = L.MEAN):
+    def get_dry_filling_series(self, which: Literal[L.UPPER, L.LOWER, L.MEAN, L.AUTO] = L.AUTO):
         """
         Uses the measured time-series and fills wet-weather periods with estimated dry-weather values.
 
@@ -1148,6 +1148,12 @@ class AnalyseData:
         dw_bool = self.get_dw_bool_series(fill_na=False, start=start, end=end)
         c.loc[dw_bool, :] = self.ts.loc[start:end].loc[dw_bool].to_numpy()[:, None]
         return c
+
+    def get_wet_filling_series_with_random_error(self, start, end, n_samples=100):
+        return self.get_dry_filling_series_with_random_error(start, end, n_samples=n_samples).mul(-1).add(self.ts[start:end], axis=0).clip(lower=0)
+
+    def get_ww_continuum_series_with_random_error(self, start, end, n_samples=100):
+        return self.get_dw_continuum_series_with_random_error(self.ts[start:end].index, n_samples=n_samples).mul(-1).add(self.ts[start:end], axis=0).clip(lower=0)
 
     ####################################################################################################################
     @property
