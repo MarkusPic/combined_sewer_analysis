@@ -446,13 +446,13 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     return ax.get_figure(), ax
 
 
-def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min', ax=None):
+def compare_all_days(data: AnalyseData, smooth=None, major_freq='h', minor_freq='15min', ax=None, ls='-'):
     data10 = AnalyseData(data.ts, limit=data.limit, kind=data.arithmetic, day_categorization=10, smooth_window=data.smooth_window)
 
     mean = data10.get_dw_mean_table(smooth=data.smooth_window if smooth is None else smooth)
 
     for day in DAY_KIND.sorter(mean.columns):
-        ax = mean[day].plot(color=daykind_color(day), legend=True, ax=ax)
+        ax = mean[day].plot(color=daykind_color(day), legend=True, ax=ax, ls=ls)
 
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)
     return ax.get_figure(), ax
@@ -548,7 +548,7 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
 
 ########################################################################################################################
 def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None,
-                                major_freq='h', minor_freq='15min', rasterized=True) -> (plt.Figure, plt.Axes):
+                                major_freq='h', minor_freq='15min', rasterized=True, ax=None) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
@@ -560,13 +560,13 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
     dw_cont_day_dw = dw_cont_day[dw_bool_day]
     diff_day = ts_day_dw - dw_cont_day_dw
 
-    dw_residuals_series_full = data.get_dw_residual_series(dw_bool_full)
-    dw_uncertainty_table = data.get_dw_uncertainty_table()
-    dw_residuals_series_day = dw_residuals_series_full[ts_day_dw.index]
+    # dw_residuals_series_full = data.get_dw_residual_series(dw_bool_full)
+    # dw_uncertainty_table = data.get_dw_uncertainty_table()
+    # dw_residuals_series_day = dw_residuals_series_full[ts_day_dw.index]
 
     # ------------
     data_table = compare_daily_times_table(diff_day)
-    ax = data_table.T.plot(alpha=0.05, legend=False, color='black', label='_nolegend_', rasterized=rasterized)
+    ax = data_table.T.plot(alpha=0.05, legend=False, color='black', label='_nolegend_', rasterized=rasterized, ax=ax)
     # ax.legend().remove()
     # ------------
     std_raw = data_table.std()

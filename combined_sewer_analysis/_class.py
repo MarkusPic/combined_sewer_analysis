@@ -403,14 +403,11 @@ class AnalyseData:
             dry_mean = self.get_dw_mean_table(smooth=1)
             variance = self.dw_variance_table(smooth=1)
 
-        if limit is None:
-            limit = self.limit
-
         bound = variance.copy()
         del bound[L.MEAN]
         bound.columns = bound.columns.remove_unused_levels()
         for sign, side in [(-1, L.LOWER), (1, L.UPPER)]:
-            bound[side] = dry_mean + (variance[side] + variance[L.MEAN] * (limit - 1)) * sign
+            bound[side] = dry_mean + (variance[side] + variance[L.MEAN] * ((limit or self.limit) - 1)) * sign
 
         return bound
 
@@ -515,11 +512,12 @@ class AnalyseData:
             diff = self.ts - self.get_dw_mean_series(arithmetic, smooth=None)
             var = self.get_dw_variance_series(arithmetic, smooth=None)
 
-
             lower = diff < -accuracy
             higher = diff > accuracy
 
             crit = diff.copy()
+            # differences very close to 0 have a crit=0
+            # for differentiate of crit below or above or equal 0
             crit[(diff > -accuracy) & (diff < accuracy)] = 0
             crit[lower] /= var.loc[lower, L.LOWER]
             crit[higher] /= var.loc[higher, L.UPPER]

@@ -101,6 +101,8 @@ def get_holidays(year, **kwargs):
         dict[date,str]: dictionary with the timestamp as the key and the name of the holiday as the value
     """
     import holidays
+    if 'OFF' in HOLIDAY_CONFIG:
+        return []
     return holidays.country_holidays(**{**HOLIDAY_CONFIG, **kwargs}, years=year)
 
 
