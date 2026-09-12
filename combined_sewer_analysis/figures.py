@@ -35,9 +35,7 @@ def diurnal_density(data: AnalyseData, day_series: pd.Series, ylim=None, ylab=No
     if isinstance(show_rain, pd.Series):
         crit = show_rain.copy()
 
-        dry = s.copy()
-        dry.loc[crit > 100] = np.nan
-        dry.name = 'DRY_{}'.format(s.name)
+        dry = s.where(crit <= 100).rename(f'DRY_{s.name}')
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
@@ -115,9 +113,7 @@ def diurnal_density2(day_series: pd.Series, data: AnalyseData, dry_data=None, sm
     if isinstance(criterion, pd.Series):
         crit = criterion.copy()
 
-        dry = s.copy()
-        dry.loc[crit > 100] = np.nan
-        dry.name = 'DRY_{}'.format(s.name)
+        dry = s.where(crit <= 100).rename(f'DRY_{s.name}')
 
         dry.dropna(inplace=True)
         data_table_dry = compare_daily_times_table(dry)
@@ -482,7 +478,7 @@ def dry_percentage(data: AnalyseData, unit=None, title=None):
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
               title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False, add_crit_var=True):
-    _g = data.get_criterion_level_series(smooth_window=smooth_window).resample(smooth_window)
+    _g = data.get_dw_level_series(smooth_window=smooth_window).resample(smooth_window)
     level = _g.mean()
     level = level[_g.count() > 0][level != 0].asfreq(level.index.freq)
     ax = level.rename('DW level').plot(color=color, zorder=2)

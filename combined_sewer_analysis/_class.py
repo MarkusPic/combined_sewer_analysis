@@ -96,7 +96,7 @@ class AnalyseData:
                  day_boundary_offset=None,
                  min_rain_period=Timedelta(hours=2),
                  trail_period=Timedelta(hours=4),
-                 dry_level_window=pd.Timedelta(days=2),
+                 dw_level_smooth_window=pd.Timedelta(days=2),
                  smooth_window=20):
         """
         Analyze dry weather conditions in continuous flow and flux measurements.
@@ -112,6 +112,8 @@ class AnalyseData:
             day_boundary_offset (Timedelta or str or None): delta to shift the time-series to set a time for a new day.
             min_rain_period (Timedelta): Minimum duration from which it is a rain event. Shorter events will be ignored.
             trail_period (Timedelta): Duration for combining rain events + duration after an event to restore dw-conditions.
+            dw_level_smooth_window (Timedelta): windows size for DW criterion smoothing for estimating the DW level
+            smooth_window (int): windows size to smooth resulting dataframes and series.
         """
         self.ts = ts.copy()
         # remove timezone info and remove timeshift range to not have a monotonic error or duplicates
@@ -203,7 +205,7 @@ class AnalyseData:
         self.trail_period = trail_period  # Duration for combining rain events + duration after an event to restore dw-conditions.
         self.min_dry_period = self.trail_period  # Minimum duration from which it is a dry period. Shorter periods will be ignored.
 
-        self.dry_level_window = dry_level_window
+        self.dw_level_smooth_window = dw_level_smooth_window
 
         # ----------------
         self.error_model = None # error model class for creating dw_cont series with random errors
@@ -538,8 +540,8 @@ class AnalyseData:
 
     def get_dw_bool_series(self, fill_na=np.nan, no_cache=False, start=None, end=None):
         if no_cache or self._dw_bool_series is None:
-            smooth_window = self.dry_level_window
-            smooth = self.get_window_size(smooth_window)
+            dw_level_smooth_window = self.dw_level_smooth_window
+            smooth = self.get_window_size(dw_level_smooth_window)
             _rolling_kwargs = dict(window=smooth, center=True, min_periods=int(smooth / 4))
 
             criterion = self.get_criterion_series()
@@ -798,6 +800,17 @@ class AnalyseData:
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
     def _smooth_criterion(criterion, smooth):
+        """
+        Smooth DW only criterion for estimating the DW level.
+        Smoothing + interpolating + set 0 for NaN (longer than 2 x smoothing_window WW periods).
+
+        Args:
+            criterion (pd.Series): DW only criterion.
+            smooth (int): window size of smoothing and interpolating.
+
+        Returns:
+            pandas.Series: DW level
+        """
         # prediction over <smooth>/4 with last values
         criterion_smooth = criterion.rolling(smooth, center=True, min_periods=int(smooth / 4)).mean()
         # interpolate between the predictions
@@ -857,7 +870,7 @@ class AnalyseData:
         return criterion_level.fillna(0)
 
     @timeit
-    def get_criterion_level_series(self, smooth_window=None):
+    def get_dw_level_series(self, smooth_window=None):
         """
         Smoothed dry-weather-criterion only considering dw-periods.
 
@@ -869,9 +882,9 @@ class AnalyseData:
             smooth_window (pd.Timedelta): duration of smooth window.
 
         Returns:
-            pd.Series: Criterion level
+            pd.Series: DW level
         """
-        smooth = self.get_window_size(smooth_window or self.dry_level_window)
+        smooth = self.get_window_size(smooth_window or self.dw_level_smooth_window)
         if self.criterion_level is None:
             criterion = self.get_criterion_series()
             dw_bool = self.get_dw_bool_series(fill_na=False)
@@ -895,7 +908,7 @@ class AnalyseData:
         if self._dw_continuum_series is None:
             regular = self.get_dw_mean_series()
             # criterion = self.get_criterion(smooth=1)  # .round(1)
-            level = self.get_criterion_level_series()  # .round(1)
+            level = self.get_dw_level_series()  # .round(1)
             var = self.get_dw_variance_series()
 
             lower = level < 0
@@ -927,7 +940,7 @@ class AnalyseData:
         regular = self.get_dw_mean_series().loc[start:end]
         var = self.get_dw_variance_series().loc[start:end]
 
-        smooth = self.get_window_size(smooth_window or self.dry_level_window)
+        smooth = self.get_window_size(smooth_window or self.dw_level_smooth_window)
         start_ext = start - smooth * self.guessed_freq
         end_ext = end + smooth * self.guessed_freq
 
@@ -982,7 +995,7 @@ class AnalyseData:
                 factor = {L.MEAN: 0,
                           L.UPPER: 100,
                           L.LOWER: -100,
-                          L.AUTO: self.get_criterion_level_series()
+                          L.AUTO: self.get_dw_level_series()
                           }[which]
 
                 criterion = self.get_criterion_series()
@@ -1095,7 +1108,7 @@ class AnalyseData:
             self.get_dw_mean_series(),
             self.get_dw_bool_series(),
             self.get_criterion_series(),
-            self.get_criterion_level_series(),
+            self.get_dw_level_series(),
             self.get_dw_continuum_series(),
             self.get_dw_uncertainty_series(),
             self.get_dw_uncertainty_band_series(),
