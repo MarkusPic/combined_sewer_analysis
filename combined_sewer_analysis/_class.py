@@ -102,7 +102,7 @@ class AnalyseData:
         Analyze dry weather conditions in continuous flow and flux measurements.
 
         Args:
-            ts (pd.Seres): with local timezone for diurnal pattern recognition.
+            ts (pd.Series): with local timezone for diurnal pattern recognition.
             kind (int): 0,6,8,97,98,1,2,7,99
             limit (float): multiplicative of MAD (median of absolute difference) which is stiff dry-weather. 2.965 MAD = 2 std = 95%
             day_categorization (int | float): 1,2,3,3.1,7,8,9,10 | weekdays, holiday, bridge-day, fake-friday, weekend,
@@ -283,8 +283,11 @@ class AnalyseData:
         return self.day_category_index.categories.tolist()
 
     @timeit
-    def get_analysis_grouper(self, day_categorization=None, add_number=None):
-        return self.ts.groupby([self.get_day_category_index(level_of_detail=day_categorization, add_number=add_number), self.ts.index.time], observed=False)
+    def get_analysis_grouper(self, day_categorization=None, add_number=None, dw_only=False):
+        ts = self.ts
+        if dw_only:
+            ts = self.ts.where(self.get_dw_bool_series(fill_na=False))
+        return ts.groupby([self.get_day_category_index(level_of_detail=day_categorization, add_number=add_number), self.ts.index.time], observed=False)
 
     def analysis_grouper(self):
         """

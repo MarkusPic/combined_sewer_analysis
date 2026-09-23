@@ -403,7 +403,7 @@ def stability_analysis(data: AnalyseData, arithmetic=None, var=False) -> (plt.Fi
 
 
 ########################################################################################################################
-def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, major_freq='h', minor_freq='15min', major_fmt='%-H') -> tuple[plt.Figure, plt.Axes]:
+def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=None, two_lines=True, major_freq='h', minor_freq='15min', major_fmt='%-H', ax = None, ls=None) -> tuple[plt.Figure, plt.Axes]:
     """
 
     Args:
@@ -421,10 +421,9 @@ def compare_day(data: AnalyseData, smooth=20, unit=None, add_bounds=True, title=
     if add_bounds:
         agg_dry_bound = data.get_dw_bound_table(smooth=smooth)
 
-    ax = None
     for day in DAY_KIND.sorter(mean.columns):
         print(day)
-        ax = mean[day].plot(ax=ax, color=daykind_color(day, data.day_categorization), legend=True)
+        ax = mean[day].plot(ax=ax, color=daykind_color(day, data.day_categorization), legend=True, ls=ls)
         if add_bounds:
             ax.fill_between(mean.index,
                             agg_dry_bound[(L.LOWER, day)],
@@ -477,15 +476,37 @@ def dry_percentage(data: AnalyseData, unit=None, title=None):
 
 ########################################################################################################################
 def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None, label='Dry-Weather Level',
-              title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False, add_crit_var=True):
-    _g = data.get_dw_level_series(smooth_window=smooth_window).resample(smooth_window)
+              title=None, mark_holidays_school=False, mark_holidays_business=False, mark_gaps=False, add_crit_var=True,
+              standard_scale=False, ax=None):
+    conversion_factor = 1
+    if standard_scale:
+        conversion_factor = 1 * data.limit / 100
+    _g = data.get_dw_level_series(smooth_window=smooth_window).mul(conversion_factor).resample(smooth_window)
     level = _g.mean()
     level = level[_g.count() > 0][level != 0].asfreq(level.index.freq)
-    ax = level.rename('DW level').plot(color=color, zorder=2)
+    ax = level.rename('DW level').plot(color=color, zorder=2, ax=ax)
+
+    # ---
+
+    ax.axhline(0, color='black', linewidth=0.7)
+    ax.axhline(data.limit if standard_scale else 100, color='darkgray', linewidth=0.7)
+    ax.axhline(-data.limit if standard_scale else -100, color='darkgray', linewidth=0.7)
+
+    ax.set_xlim(level.index[0], level.index[-1])
+
+    if mark_gaps:
+        y0, y1 = ax.get_ylim()
+        y_max = y1
+        dy = (y1 - y0) / 30
+        nan_event = span_table(data.ts.isna().resample('7d').mean() > 0.5)
+        event_line_axes(nan_event, ax, y1, dy, color='grey', label='Gaps')
+        ax.axhline(y1, color='black', linewidth=0.7)
+        # ax.text(ax.get_xlim()[0], y1+dy/2, 'Gaps  ', va='center_baseline', ha='right')
+        ax.set_ylim(y0, y_max + dy)
 
     # ---
     if add_crit_var:
-        criterion = data.get_criterion_series()
+        criterion = data.get_criterion_series().mul(conversion_factor)
         dw_bool = data.get_dw_bool_series(fill_na=False)
         criterion[~dw_bool] = np.nan
 
@@ -495,9 +516,6 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
         # criterion.plot(ax=ax, lw=0.5, color='black', zorder=0, alpha=.2)
 
         ax.fill_between(crit_std.index, level-crit_std, level+crit_std, color='C0', alpha=.25, label='Criterion variability', zorder=2)
-
-    # ---
-    ax.set_xlim(level.index[0], level.index[-1])
 
     if mark_holidays_school:
         school_free = get_school_holidays().rename(columns={'Beginn': 'start', 'Ende': 'end'})
@@ -520,20 +538,6 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
             ax.axvspan(day, day + pd.Timedelta(days=1, seconds=-1), color='red', alpha=0.6, label=_label)
             _label = None
 
-    ax.axhline(0, color='black', linewidth=0.7)
-    ax.axhline(100, color='darkgray', linewidth=0.7)
-    ax.axhline(-100, color='darkgray', linewidth=0.7)
-
-    if mark_gaps:
-        y0, y1 = ax.get_ylim()
-        y_max = y1
-        dy = (y1 - y0) / 30
-        nan_event = span_table(data.ts.isna().resample('7d').mean() > 0.5)
-        event_line_axes(nan_event, ax, y1, dy, color='grey', label='Gaps')
-        ax.axhline(y1, color='black', linewidth=0.7)
-        # ax.text(ax.get_xlim()[0], y1+dy/2, 'Gaps  ', va='center_baseline', ha='right')
-        ax.set_ylim(y0, y_max + dy)
-
     ax.set_ylabel(label)
     ax.set_xlabel('')
     ax.legend(handlelength=1.5)
@@ -544,7 +548,8 @@ def dry_trend(data: AnalyseData, smooth_window=pd.Timedelta(days=2), color=None,
 
 ########################################################################################################################
 def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=None,
-                                major_freq='h', minor_freq='15min', rasterized=True, ax=None) -> (plt.Figure, plt.Axes):
+                                major_freq='h', minor_freq='15min', rasterized=True, ax=None,
+                                add_1=False, add_2=False, add_3=False, add_bias=False) -> (plt.Figure, plt.Axes):
     day = day_series.name
 
     # ------------
@@ -567,23 +572,38 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
     # ------------
     std_raw = data_table.std()
     std = std_raw.rolling(smooth, center=True, min_periods=1).mean()
-    interval_68 = std
-    interval_95 = std * 2
-    interval_99 = std * 3
 
-    ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label=r'68.3% (1 $\sigma$)')
-    ax.plot(interval_68.index, interval_68, color='orange', ls='--', lw=0.75)
+    if add_bias:
+        bias_raw = data_table.mean()
+        bias = bias_raw.rolling(smooth, center=True, min_periods=1).mean()
+        # ax.plot(bias.index, bias, color='blue', ls='--', lw=0.75, label='Bias')
+        ax.fill_between(bias.index, bias, 0, color='blue', alpha=0.5, lw=0.75, ls='--', label='Bias')
 
-    ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label=r'95.4% (2 $\sigma$)')
-    ax.plot(interval_95.index, interval_95, color='red', ls='--', lw=0.75)
+    if add_1:
+        interval_68 = std
+        ax.plot(interval_68.index, -interval_68, color='orange', ls='--', lw=0.75, label=r'68.3% (1 $\sigma$)')
+        ax.plot(interval_68.index, interval_68, color='orange', ls='--', lw=0.75)
 
-    ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label=r'99.7% (3 $\sigma$)')
-    ax.plot(interval_99.index, interval_99, color='darkviolet', ls='--', lw=0.75)
+    if add_2:
+        interval_95 = std * 2
+        ax.plot(interval_95.index, -interval_95, color='red', ls='--', lw=0.75, label='2*SD')
+        ax.plot(interval_95.index, interval_95, color='red', ls='--', lw=0.75)
+
+        range_low = data_table.quantile(0.025).rolling(smooth, center=True, min_periods=1).mean()
+        range_up = data_table.quantile(0.975).rolling(smooth, center=True, min_periods=1).mean()
+
+        ax.plot(range_low.index, range_low, color='orange', ls='--', lw=0.75, label='95% range')
+        ax.plot(range_up.index, range_up, color='orange', ls='--', lw=0.75)
+
+    if add_3:
+        interval_99 = std * 3
+        ax.plot(interval_99.index, -interval_99, color='darkviolet', ls='--', lw=0.75, label=r'99.7% (3 $\sigma$)')
+        ax.plot(interval_99.index, interval_99, color='darkviolet', ls='--', lw=0.75)
 
     # ------------
-    if ylim is None:
-        ylim = interval_99.max()
-    ax.set_ylim(-ylim, ylim)
+    # if ylim is None:
+    #     ylim = interval_99.max()
+    # ax.set_ylim(-ylim, ylim)
 
     # ------------
     ax = diurnal_axes(ax, major_freq=major_freq, minor_freq=minor_freq)  # , ylab=cst_label(data.name, unit=unit), title=title)
@@ -591,7 +611,7 @@ def diurnal_uncertainty_density(data: AnalyseData, day_series, smooth=20, ylim=N
 
     lines_dict_ = get_legend_dict(ax)
     lines_dict_ = {k: v for k, v in lines_dict_.items() if not k.startswith('20')}
-    add_custom_legend(ax, lines_dict_, title='Confidence interval', bbox_to_anchor=(0, 0, 1, 0), loc='lower left', ncol=3, )
+    add_custom_legend(ax, lines_dict_, bbox_to_anchor=(0, 0, 1, 0), loc='lower left', ncol=1, handlelength=1)
 
     # ------------
     ax.set_title(f'{day} - Uncertainty')

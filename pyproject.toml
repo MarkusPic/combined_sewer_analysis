@@ -33,3 +33,6 @@ dependencies = [
     "scipy",
     "pyarrow"
 ]
+
+[project.optional-dependencies]
+synthetic_test = ["swmm-api"]
