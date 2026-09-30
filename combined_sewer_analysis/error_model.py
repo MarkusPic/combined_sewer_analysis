@@ -115,7 +115,7 @@ class ResidualUncertaintyModel:
         # Fit an autoregressive model to the centered standardized residuals.
         # The fitted coefficients describe how much previous residual states
         # influence the current residual state.
-        self.ar_model_ = AutoReg(z_centered, lags=self.ar_lags, old_names=False).fit()
+        self.ar_model_ = AutoReg(z_centered, lags=self.ar_lags).fit()
 
         # The residuals of the AR model are the innovations: the part of z_t
         # that cannot be explained by previous time steps. Their standard
