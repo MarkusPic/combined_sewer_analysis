@@ -2,7 +2,9 @@
 
 This is a companion repository for the research article "Decomposition of Dry- and Wet-Weather Flows in Combined Sewer Measurements" by Pichler & Muschalla (2026).
 
-The paper is submitted to publish and will be linked as soon as it is published.
+Please cite as:
+> Pichler, M., & Muschalla, D. (2026). Decomposition of Dry- and Wet-Weather Flows in Combined Sewer Measurements. Water, 18(20), 2486. https://doi.org/10.3390/w18202486
+
 
 ```python
 import pandas as pd

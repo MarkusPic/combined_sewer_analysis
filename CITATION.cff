@@ -1,0 +1,38 @@
+# This CITATION.cff reference content was generated from Zotero.
+message: "If you use this software, please cite it as below."
+title: >-
+  Decomposition of Dry- and Wet-Weather Flows in Combined Sewer Measurements
+abstract: |
+  In-sewer measurements provide valuable insights into urban catchment behaviour, but their interpretation requires distinguishing dry- and wet-weather contributions. This study presents a novel, parameter-light method for decomposing long-term flow and load-rate measurements into continuous dry-weather (DW) and wet-weather (WW) components. The approach combines characteristic diurnal patterns for different day categories with a time-varying DW level and a DW/WW indicator to estimate the DW contribution. This enables identification of WW event start and end and consistent separation of DW and WW contributions. The method was evaluated using three years of high-resolution in-sewer flow data; the corresponding COD load-rate series and a 12-year WWTP inflow series were also analysed. For the in-sewer flow data, the method achieved a root-mean-square error of 4.2 L/s at a mean DW flow of 38 L/s and reduced estimation uncertainty compared with a reference method. Multi-year observations improve long-term DW volume estimation, whereas shorter periods are suitable for estimating DW contributions to individual WW events. The method supports WW-event detection without rainfall measurements, separation of event-specific DW and WW loads and volumes, and reconstruction of continuous DW time series for subsequent modelling and analysis.
+type: journalArticle
+license: http://creativecommons.org/licenses/by/3.0/
+copyright: http://creativecommons.org/licenses/by/3.0/
+database: www.mdpi.com
+date-accessed: 2026-10-09T06:59:48Z
+issn: 2073-4441
+issue: 20
+languages:
+  - en
+pages: 2486
+publisher: Multidisciplinary Digital Publishing Institute
+volume: 18
+url: https://www.mdpi.com/2073-4441/18/20/2486
+authors:
+  - family-names: Pichler
+    given-names: Markus
+    orcid: https://orcid.org/0000-0002-8101-2163
+    affiliation: Graz University of Technology; Department of Civil- and Environmental Engineering, Norwegian University of Science and Technology,  7034 Trondheim, Norway
+  - family-names: Muschalla
+    given-names: Dirk
+    orcid: https://orcid.org/0000-0002-9880-8774
+    affiliation: Graz University of Technology
+date-published: 2026-01
+identifiers:
+  - type: doi
+    value: 10.3390/w18202486
+keywords:
+    - decomposition
+    - DWF
+    - anomaly detection
+    - gap filling
+    - event detection
