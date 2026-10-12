@@ -1,4 +1,5 @@
 import calendar
+import sys
 
 import pandas as pd
 from datetime import datetime, timedelta
@@ -130,6 +131,9 @@ def diurnal_axes(ax, ylim=None, ylab=None, title=None, reference_time='00:00', x
         ax.set_xlabel('Hours of the day')
     else:
         ax.set_xlabel(xlabel)
+
+    if ('%-' in major_fmt) and (sys.platform == 'win32'):
+        major_fmt = major_fmt.replace('%-', '%#')
 
     # MAJOR
     major_ticks = pd.date_range("00:00", "23:59", freq=major_freq).append(pd.DatetimeIndex(['23:59:59.999999']))
